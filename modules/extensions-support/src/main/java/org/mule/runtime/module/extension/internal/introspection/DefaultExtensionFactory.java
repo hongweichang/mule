@@ -293,6 +293,7 @@ public final class DefaultExtensionFactory implements ExtensionFactory {
                                          parameter.isRequired(),
                                          parameter.getExpressionSupport(),
                                          parameter.getDefaultValue(),
+                                         parameter.getPurpose(),
                                          parameter.getDslModel(),
                                          parameter.getDisplayModel(),
                                          parameter.getLayoutModel(),

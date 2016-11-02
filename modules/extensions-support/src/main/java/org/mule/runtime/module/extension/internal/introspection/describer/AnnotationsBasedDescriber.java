@@ -13,6 +13,9 @@ import static org.mule.runtime.api.meta.ExpressionSupport.NOT_SUPPORTED;
 import static org.mule.runtime.api.meta.model.connection.ConnectionManagementType.CACHED;
 import static org.mule.runtime.api.meta.model.connection.ConnectionManagementType.NONE;
 import static org.mule.runtime.api.meta.model.connection.ConnectionManagementType.POOLING;
+import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.CONTENT;
+import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.PARAMETERIZATION;
+import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.PRIMARY_CONTENT;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.extension.api.annotation.Extension.DEFAULT_CONFIG_DESCRIPTION;
 import static org.mule.runtime.extension.api.annotation.Extension.DEFAULT_CONFIG_NAME;
@@ -48,6 +51,7 @@ import org.mule.runtime.api.meta.model.declaration.fluent.ParameterDeclarer;
 import org.mule.runtime.api.meta.model.declaration.fluent.ParameterizedDeclarer;
 import org.mule.runtime.api.meta.model.declaration.fluent.SourceDeclarer;
 import org.mule.runtime.api.meta.model.display.LayoutModel;
+import org.mule.runtime.api.meta.model.parameter.ParameterPurpose;
 import org.mule.runtime.core.util.ArrayUtils;
 import org.mule.runtime.core.util.CollectionUtils;
 import org.mule.runtime.extension.api.annotation.Configuration;
@@ -76,9 +80,9 @@ import org.mule.runtime.extension.api.exception.IllegalOperationModelDefinitionE
 import org.mule.runtime.extension.api.exception.IllegalParameterModelDefinitionException;
 import org.mule.runtime.extension.api.exception.IllegalSourceModelDefinitionException;
 import org.mule.runtime.extension.api.manifest.DescriberManifest;
-import org.mule.runtime.extension.api.model.property.ContentParameterModelProperty;
 import org.mule.runtime.extension.api.model.property.PagedOperationModelProperty;
 import org.mule.runtime.extension.api.runtime.operation.InterceptingCallback;
+import org.mule.runtime.extension.api.runtime.operation.ParameterResolver;
 import org.mule.runtime.extension.api.runtime.streaming.PagingProvider;
 import org.mule.runtime.module.extension.internal.introspection.BasicTypeMetadataVisitor;
 import org.mule.runtime.module.extension.internal.introspection.describer.contributor.FunctionParameterTypeContributor;
@@ -517,11 +521,8 @@ public final class AnnotationsBasedDescriber implements Describer {
                     .defaultingTo(extensionParameter.defaultValue().isPresent() ? extensionParameter.defaultValue().get() : null);
         parameter.ofType(extensionParameter.getMetadataType(typeLoader));
 
-        if (extensionParameter.isAnnotatedWith(Content.class)) {
-          parameter.getDeclaration().addModelProperty(new ContentParameterModelProperty());
-        }
-
         parameter.describedAs(EMPTY);
+        parseParameterPurpose(extensionParameter, parameter);
         parseExpressionSupport(extensionParameter, parameter);
         parseNotNull(extensionParameter, parameter);
         addTypeRestrictions(extensionParameter, parameter);
@@ -605,6 +606,14 @@ public final class AnnotationsBasedDescriber implements Describer {
 
   private boolean isExtensible() {
     return extensionType.getAnnotation(Extensible.class) != null;
+  }
+
+  private void parseParameterPurpose(ExtensionParameter extensionParameter, ParameterDeclarer parameter) {
+    ParameterPurpose purpose = extensionParameter.getAnnotation(Content.class)
+        .map(c -> c.primary() ? PRIMARY_CONTENT : CONTENT)
+        .orElse(PARAMETERIZATION);
+
+    parameter.forPurpose(purpose);
   }
 
   private void parseExpressionSupport(ExtensionParameter extensionParameter, ParameterDeclarer parameter) {
