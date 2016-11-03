@@ -95,9 +95,11 @@ public abstract class AbstractExtensionObjectFactory<T> implements ObjectFactory
           ValueResolver<?> resolver = null;
           if (parameters.containsKey(parameterName)) {
             resolver = toValueResolver(parameters.get(parameterName));
-          } else if (isNullSafe(p)) {
-            resolver = NullSafeValueResolverWrapper
-                .of(p.getType(), new StaticValueResolver<>(null), p.getModelProperties(), muleContext);
+          }
+
+          if (isNullSafe(p)) {
+            resolver = resolver != null ? resolver : new StaticValueResolver<>(null);
+            resolver = NullSafeValueResolverWrapper.of(p.getType(), resolver, p.getModelProperties(), muleContext);
           }
 
           if (resolver != null) {
@@ -220,8 +222,8 @@ public abstract class AbstractExtensionObjectFactory<T> implements ObjectFactory
 
       if (group.isOneRequired() && parametersFromGroup.isEmpty()) {
         throw new ConfigurationException((createStaticMessage(
-                                                              format("Parameter group '%s' requires that one of its optional parameters should be set but all of them are missing",
-                                                                     group.getType().getName()))));
+            format("Parameter group '%s' requires that one of its optional parameters should be set but all of them are missing",
+                   group.getType().getName()))));
       }
     }
   }
@@ -229,10 +231,10 @@ public abstract class AbstractExtensionObjectFactory<T> implements ObjectFactory
   private ConfigurationException buildExclusiveParametersException(EnrichableModel model,
                                                                    Multimap<Class<?>, Field> parametersFromGroup) {
     return new ConfigurationException(
-                                      createStaticMessage(format("In %s '%s', the following parameters cannot be set at the same time: [%s]",
-                                                                 getComponentModelTypeName(model), getModelName(model),
-                                                                 Joiner.on(", ")
-                                                                     .join(getOffendingParameterNames(parametersFromGroup)))));
+        createStaticMessage(format("In %s '%s', the following parameters cannot be set at the same time: [%s]",
+                                   getComponentModelTypeName(model), getModelName(model),
+                                   Joiner.on(", ")
+                                       .join(getOffendingParameterNames(parametersFromGroup)))));
   }
 
   private Set<String> getOffendingParameterNames(Multimap<Class<?>, Field> parametersFromGroup) {

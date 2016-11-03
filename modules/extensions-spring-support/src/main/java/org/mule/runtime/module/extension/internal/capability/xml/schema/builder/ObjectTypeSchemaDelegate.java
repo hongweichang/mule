@@ -13,6 +13,7 @@ import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.mule.metadata.internal.utils.MetadataTypeUtils.getDefaultValue;
+import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.PARAMETERIZATION;
 import static org.mule.runtime.extension.api.declaration.type.TypeUtils.getExpressionSupport;
 import static org.mule.runtime.extension.api.declaration.type.TypeUtils.getLayoutModel;
 import static org.mule.runtime.extension.api.util.NameUtils.sanitizeName;
@@ -434,7 +435,7 @@ final class ObjectTypeSchemaDelegate {
   private ImmutableParameterModel asParameter(ObjectFieldType field) {
     return new ImmutableParameterModel(field.getKey().getName().getLocalPart(), "", field.getValue(), false, field.isRequired(),
                                        getExpressionSupport(field), getDefaultValue(field).orElse(null),
-                                       ElementDslModel.getDefaultInstance(),
+                                       PARAMETERIZATION, ElementDslModel.getDefaultInstance(),
                                        null, getLayoutModel(field).orElse(null), emptySet());
   }
 
