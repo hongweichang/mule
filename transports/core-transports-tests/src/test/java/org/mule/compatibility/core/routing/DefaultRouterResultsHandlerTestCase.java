@@ -32,6 +32,7 @@ import org.mule.runtime.core.api.MuleSession;
 import org.mule.runtime.core.api.config.MuleConfiguration;
 import org.mule.runtime.core.api.message.InternalMessage;
 import org.mule.runtime.core.api.routing.RouterResultsHandler;
+import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.core.construct.Flow;
 import org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.routing.DefaultRouterResultsHandler;
@@ -59,7 +60,13 @@ public class DefaultRouterResultsHandlerTestCase extends AbstractMuleContextEndp
     when(endpoint.getEndpointURI()).thenReturn(new MuleEndpointURI("test://test", muleContext));
     when(endpoint.getTransactionConfig()).thenReturn(new MuleTransactionConfig());
     when(endpoint.getExchangePattern()).thenReturn(ONE_WAY);
+<<<<<<< 719e3c36b529819a1d819a5d962c4a711756efb0
     when(flow.getProcessingStrategy()).thenReturn(new SynchronousProcessingStrategyFactory().create(muleContext));
+||||||| merged common ancestors
+    when(flow.getProcessingStrategy()).thenReturn(new SynchronousProcessingStrategyFactory().create());
+=======
+    when(flow.getProcessingStrategyFactory()).thenReturn(new SynchronousProcessingStrategyFactory());
+>>>>>>> MULE-10808 Migrate AsyncProcessingStrategy to use new Non-Blocking API.
     when(flow.getMuleContext()).thenReturn(muleContext);
     when(muleContext.getConfiguration()).thenReturn(mock(MuleConfiguration.class));
     context = DefaultEventContext.create(flow, TEST_CONNECTOR);

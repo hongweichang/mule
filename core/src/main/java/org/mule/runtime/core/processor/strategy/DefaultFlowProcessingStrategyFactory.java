@@ -7,26 +7,31 @@
 package org.mule.runtime.core.processor.strategy;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-
+import static reactor.core.publisher.Flux.from;
+import static reactor.core.publisher.Flux.just;
+import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
+import org.mule.runtime.core.api.construct.Pipeline;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
-import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 import org.mule.runtime.core.api.registry.RegistrationException;
 import org.mule.runtime.core.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
-import org.mule.runtime.core.processor.AsyncInterceptingMessageProcessor;
-import org.mule.runtime.core.processor.LaxAsyncInterceptingMessageProcessor;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory.AsynchronousProcessingStrategy;
+import org.mule.runtime.core.exception.MessagingException;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 /**
  * This factory's processing strategy uses the 'asynchronous' strategy where possible, but if an event is synchronous it processes
  * it synchronously rather than failing.
  */
-public class DefaultFlowProcessingStrategyFactory implements ProcessingStrategyFactory {
+public class DefaultFlowProcessingStrategyFactory extends AsynchronousProcessingStrategyFactory {
 
   @Override
   public ProcessingStrategy create(MuleContext muleContext) {
@@ -36,21 +41,48 @@ public class DefaultFlowProcessingStrategyFactory implements ProcessingStrategyF
       } catch (RegistrationException e) {
         throw new MuleRuntimeException(e);
       }
-    }, scheduler -> scheduler.stop(muleContext.getConfiguration().getShutdownTimeout(), MILLISECONDS),
-                                             new SynchronousProcessingStrategyFactory().create(muleContext));
+    }, scheduler -> scheduler.stop(muleContext.getConfiguration().getShutdownTimeout(), MILLISECONDS), muleContext);
   }
 
-  public static class DefaultFlowProcessingStrategy extends AsynchronousProcessingStrategy {
+  static class DefaultFlowProcessingStrategy extends AsynchronousProcessingStrategy {
 
     public DefaultFlowProcessingStrategy(Supplier<Scheduler> schedulerSupplier, Consumer<Scheduler> schedulerStopper,
-                                         ProcessingStrategy synchronousProcessingStrategy) {
-      super(schedulerSupplier, schedulerStopper, synchronousProcessingStrategy);
+                                         MuleContext muleContext) {
+      super(schedulerSupplier, schedulerStopper, muleContext);
     }
 
     @Override
-    protected AsyncInterceptingMessageProcessor createAsyncMessageProcessor() {
-      return new LaxAsyncInterceptingMessageProcessor();
+    public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
+                                                                   Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
+      return publisher -> from(publisher).concatMap(request -> {
+        Flux<Event> flux = just(request);
+
+        if (canProcessAsync(request)) {
+          flux = flux.doOnNext(event -> fireAsyncScheduledNotification(event, pipeline))
+              .publishOn(fromExecutorService(getScheduler()));
+        }
+
+        flux = flux.transform(publisherFunction);
+
+        if (canProcessAsync(request)) {
+          flux = flux.map(response -> request)
+              // Conserve existing 3.x async processing strategy behaviuor:
+              // i) The request event is echoed rather than the the result of async processing returned
+              // ii) Any exceptions that occur due to async processing are not propagated upwards but rather handled here
+              .doOnNext(event -> fireAsyncCompleteNotification(event, pipeline, null))
+              .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(request, pipeline, e))
+              .onErrorResumeWith(MessagingException.class, pipeline.getExceptionListener())
+              .onErrorReturn(MessagingException.class, request);
+
+        }
+
+        return flux;
+      });
+
     }
 
+    protected boolean canProcessAsync(Event event) {
+      return !(event.isSynchronous() || event.isTransacted());
+    }
   }
 }

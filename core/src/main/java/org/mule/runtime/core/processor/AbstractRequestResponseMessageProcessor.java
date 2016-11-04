@@ -93,7 +93,13 @@ public abstract class AbstractRequestResponseMessageProcessor extends AbstractIn
    * @return function that performs request processing
    */
   protected Function<Publisher<Event>, Publisher<Event>> processRequest() {
-    return stream -> from(stream).handle(nullSafeMap(checkedFunction(event -> processRequest(event))));
+    return stream -> from(stream).map(event -> {
+      try {
+        return processRequest(event);
+      } catch (MuleException e) {
+        throw propagate(e);
+      }
+    });
   }
 
   /**

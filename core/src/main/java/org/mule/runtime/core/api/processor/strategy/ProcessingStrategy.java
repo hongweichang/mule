@@ -7,12 +7,10 @@
 package org.mule.runtime.core.api.processor.strategy;
 
 import static reactor.core.publisher.Flux.from;
-
 import org.mule.runtime.core.api.Event;
-import org.mule.runtime.core.api.processor.MessageProcessorChainBuilder;
+import org.mule.runtime.core.api.construct.Pipeline;
 import org.mule.runtime.core.api.processor.Processor;
 
-import java.util.List;
 import java.util.function.Function;
 
 import org.reactivestreams.Publisher;
@@ -22,7 +20,10 @@ import org.reactivestreams.Publisher;
  */
 public interface ProcessingStrategy {
 
-  void configureProcessors(List<Processor> processors, MessageProcessorChainBuilder chainBuilder);
+  default Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
+                                                                  Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
+    return publisher -> from(publisher).transform(publisherFunction);
+  }
 
   default Function<Publisher<Event>, Publisher<Event>> onProcessor(Processor messageProcessor,
                                                                    Function<Publisher<Event>, Publisher<Event>> publisherFunction) {

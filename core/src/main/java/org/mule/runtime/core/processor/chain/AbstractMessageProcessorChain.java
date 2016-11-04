@@ -14,10 +14,14 @@ import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.setMuleContextI
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.core.context.notification.MessageProcessorNotification.MESSAGE_PROCESSOR_POST_INVOKE;
 import static org.mule.runtime.core.context.notification.MessageProcessorNotification.MESSAGE_PROCESSOR_PRE_INVOKE;
+import static org.mule.runtime.core.util.ExceptionUtils.createErrorEvent;
+import static org.mule.runtime.core.util.ExceptionUtils.getErrorTypeFromFailingProcessor;
 import static org.mule.runtime.core.execution.MessageProcessorExecutionTemplate.createExecutionTemplate;
 import static org.slf4j.LoggerFactory.getLogger;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
+import org.mule.runtime.api.message.Error;
+import org.mule.runtime.api.message.ErrorType;
 import org.mule.runtime.core.AbstractAnnotatedObject;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
@@ -37,12 +41,14 @@ import org.mule.runtime.core.context.notification.MessageProcessorNotification;
 import org.mule.runtime.core.context.notification.ServerNotificationManager;
 import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.core.execution.MessageProcessorExecutionTemplate;
+import org.mule.runtime.core.message.ErrorBuilder;
 import org.mule.runtime.core.util.NotificationUtils;
 import org.mule.runtime.core.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -117,9 +123,13 @@ public abstract class AbstractMessageProcessorChain extends AbstractAnnotatedObj
         .transform(stream -> from(stream.transform(processor)))
         // If there is a messaging exception, reacreate it to add reference to processor that failed.
         .mapError(MessagingException.class,
-                  exception -> new MessagingException(exception.getEvent(), exception.getCauseException(), processor))
+                  exception -> {
+                    exception.setProcessedEvent(createErrorEvent(exception.getEvent(), processor, exception, muleContext));
+                    return exception;
+                  })
         .doOnNext(result -> setCurrentEvent(result))
         .doOnNext(postNotification(processor))
+        .doOnError(e -> System.out.println("ERROR THROW BY PROCESSOR" + processor.getClass().getName()))
         .doOnError(MessagingException.class, errorNotification(processor));
   }
 

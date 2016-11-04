@@ -6,7 +6,6 @@
  */
 package org.mule.runtime.core.processor;
 
-import static java.util.Collections.singletonList;
 import static org.mule.runtime.core.MessageExchangePattern.ONE_WAY;
 import static org.mule.runtime.core.api.Event.setCurrentEvent;
 import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.startIfNeeded;
@@ -14,23 +13,23 @@ import static org.mule.runtime.core.api.lifecycle.LifecycleUtils.stopIfNeeded;
 import static org.mule.runtime.core.config.i18n.CoreMessages.asyncDoesNotSupportTransactions;
 import static org.mule.runtime.core.config.i18n.CoreMessages.objectIsNull;
 import static org.mule.runtime.core.util.rx.Exceptions.checkedConsumer;
+import static org.mule.runtime.core.util.rx.Exceptions.rxExceptionToMuleException;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
-
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.api.Event;
+import org.mule.runtime.core.api.construct.Pipeline;
 import org.mule.runtime.core.api.lifecycle.Initialisable;
 import org.mule.runtime.core.api.lifecycle.InitialisationException;
 import org.mule.runtime.core.api.lifecycle.Startable;
 import org.mule.runtime.core.api.lifecycle.Stoppable;
 import org.mule.runtime.core.api.message.InternalMessage;
-import org.mule.runtime.core.api.processor.MessageProcessorChainBuilder;
+import org.mule.runtime.core.api.processor.MessageProcessorChain;
 import org.mule.runtime.core.api.processor.MessageProcessorPathElement;
 import org.mule.runtime.core.api.processor.Processor;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 import org.mule.runtime.core.api.routing.RoutingException;
-import org.mule.runtime.core.processor.chain.DefaultMessageProcessorChainBuilder;
 import org.mule.runtime.core.util.NotificationUtils;
 import org.mule.runtime.core.work.MuleWorkManager;
 
@@ -41,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 /**
  * Processes {@link Event}'s asynchronously using a {@link MuleWorkManager} to schedule asynchronous processing of
@@ -54,16 +54,13 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
   protected Logger logger = LoggerFactory.getLogger(getClass());
   private AtomicBoolean consumablePayloadWarned = new AtomicBoolean(false);
 
-  protected Processor delegate;
+  protected MessageProcessorChain delegate;
 
-  protected List<Processor> processors;
   protected ProcessingStrategyFactory processingStrategyFactory;
   protected ProcessingStrategy processingStrategy;
   protected String name;
 
-  private Processor target;
-
-  public AsyncDelegateMessageProcessor(Processor delegate,
+  public AsyncDelegateMessageProcessor(MessageProcessorChain delegate,
                                        ProcessingStrategyFactory processingStrategyFactory,
                                        String name) {
     this.delegate = delegate;
@@ -80,12 +77,6 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
       throw new InitialisationException(objectIsNull("processingStrategy"), this);
     }
     processingStrategy = processingStrategyFactory.create(muleContext);
-
-    validateFlowConstruct();
-
-    MessageProcessorChainBuilder builder = new DefaultMessageProcessorChainBuilder();
-    processingStrategy.configureProcessors(singletonList(delegate), builder);
-    target = builder.build();
     super.initialise();
   }
 
@@ -109,15 +100,11 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
 
   @Override
   public Event process(Event event) throws MuleException {
-    assertNotTransactional(event);
-
-    final InternalMessage message = event.getMessage();
-    warnConsumablePayload(message);
-
-    if (target != null) {
-      target.process(updateEventForAsync(event));
+    try {
+      return Mono.just(event).transform(this).block();
+    } catch (Throwable e) {
+      throw rxExceptionToMuleException(e, true);
     }
-    return event;
   }
 
   private void assertNotTransactional(Event event) throws RoutingException {
@@ -128,10 +115,14 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
 
   @Override
   public Publisher<Event> apply(Publisher<Event> publisher) {
-    return from(publisher).concatMap(request -> just(request)
-        .doOnNext(checkedConsumer(event -> assertNotTransactional(event)))
-        .doOnNext(event -> warnConsumablePayload(event.getMessage())).map(event -> updateEventForAsync(event)).transform(target)
-        .map(event -> request));
+    return from(publisher)
+        .concatMap(request -> just(request)
+            .doOnNext(checkedConsumer(event -> assertNotTransactional(event)))
+            .doOnNext(event -> warnConsumablePayload(event.getMessage()))
+            .map(event -> updateEventForAsync(event))
+            .transform(flowConstruct instanceof Pipeline ? processingStrategy.onPipeline((Pipeline) flowConstruct, delegate)
+                : s -> s)
+            .map(event -> request));
   }
 
   private Event updateEventForAsync(Event event) {
@@ -150,13 +141,13 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
     }
   }
 
-  public void setDelegate(Processor delegate) {
+  public void setDelegate(MessageProcessorChain delegate) {
     this.delegate = delegate;
   }
 
   @Override
   protected List<Processor> getOwnedMessageProcessors() {
-    return Collections.singletonList(target);
+    return Collections.singletonList(delegate);
   }
 
   public ProcessingStrategy getProcessingStrategy() {

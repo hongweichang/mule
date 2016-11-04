@@ -10,7 +10,6 @@ import static org.mule.runtime.core.api.Event.setCurrentEvent;
 import static org.mule.runtime.core.execution.ErrorHandlingExecutionTemplate.createErrorHandlingExecutionTemplate;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
-
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.message.Error;
 import org.mule.runtime.core.api.DefaultMuleException;
@@ -30,13 +29,13 @@ import org.mule.runtime.core.construct.processor.FlowConstructStatisticsMessageP
 import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.core.interceptor.ProcessingTimeInterceptor;
 import org.mule.runtime.core.management.stats.FlowConstructStatistics;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory.AsynchronousProcessingStrategy;
 import org.mule.runtime.core.processor.strategy.DefaultFlowProcessingStrategyFactory;
 import org.mule.runtime.core.routing.requestreply.AsyncReplyToPropertyRequestReplyReplier;
 
 import java.util.Optional;
 
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 
 /**
  * This implementation of {@link AbstractPipeline} adds the following functionality:
@@ -45,8 +44,6 @@ import org.reactivestreams.Publisher;
  * <li>Gathers statistics and processing time data</li>
  * <li>Implements MessagePorcessor allowing direct invocation of the pipeline</li>
  * <li>Supports the optional configuration of a {@link ProcessingStrategy} that determines how message processors are processed.
- * The default {@link ProcessingStrategy} is {@link AsynchronousProcessingStrategy}. With this strategy when messages are received
- * from a one-way message source and there is no current transactions message processing in another thread asynchronously.</li>
  * </ul>
  */
 public class Flow extends AbstractPipeline implements Processor, DynamicPipeline {
@@ -59,18 +56,22 @@ public class Flow extends AbstractPipeline implements Processor, DynamicPipeline
 
   @Override
   public Event process(final Event event) throws MuleException {
-    final Event newEvent = createMuleEventForCurrentFlow(event, event.getReplyToDestination(), event.getReplyToHandler());
-    try {
-      ExecutionTemplate<Event> executionTemplate =
-          createErrorHandlingExecutionTemplate(muleContext, this, getExceptionListener());
-      Event result = executionTemplate.execute(() -> pipeline.process(newEvent));
-      return createReturnEventForParentFlowConstruct(result, event);
-    } catch (MessagingException e) {
-      e.setProcessedEvent(createReturnEventForParentFlowConstruct(e.getEvent(), event));
-      throw e;
-    } catch (Exception e) {
-      resetRequestContextEvent(event);
-      throw new DefaultMuleException(CoreMessages.createStaticMessage("Flow execution exception"), e);
+    if (event.isSynchronous() || isSynchronous()) {
+      final Event newEvent = createMuleEventForCurrentFlow(event, event.getReplyToDestination(), event.getReplyToHandler());
+      try {
+        ExecutionTemplate<Event> executionTemplate =
+            createErrorHandlingExecutionTemplate(muleContext, this, getExceptionListener());
+        Event result = executionTemplate.execute(() -> pipeline.process(newEvent));
+        return createReturnEventForParentFlowConstruct(result, event);
+      } catch (MessagingException e) {
+        e.setProcessedEvent(createReturnEventForParentFlowConstruct(e.getEvent(), event));
+        throw e;
+      } catch (Exception e) {
+        resetRequestContextEvent(event);
+        throw new DefaultMuleException(CoreMessages.createStaticMessage("Flow execution exception"), e);
+      }
+    } else {
+      return Mono.from(apply(Mono.just(event))).block();
     }
   }
 

@@ -7,26 +7,33 @@
 package org.mule.runtime.core.processor.strategy;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-
+import static org.mule.runtime.core.context.notification.AsyncMessageNotification.PROCESS_ASYNC_COMPLETE;
+import static org.mule.runtime.core.context.notification.AsyncMessageNotification.PROCESS_ASYNC_SCHEDULED;
+import static reactor.core.publisher.Flux.from;
+import static reactor.core.publisher.Flux.just;
+import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
+import org.mule.runtime.core.api.construct.Pipeline;
 import org.mule.runtime.core.api.lifecycle.Startable;
 import org.mule.runtime.core.api.lifecycle.Stoppable;
-import org.mule.runtime.core.api.processor.MessageProcessorChainBuilder;
-import org.mule.runtime.core.api.processor.Processor;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 import org.mule.runtime.core.api.registry.RegistrationException;
 import org.mule.runtime.core.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
-import org.mule.runtime.core.processor.AsyncInterceptingMessageProcessor;
+import org.mule.runtime.core.context.notification.AsyncMessageNotification;
+import org.mule.runtime.core.exception.MessagingException;
 
-import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import javax.resource.spi.work.WorkManager;
+
+import org.reactivestreams.Publisher;
 
 /**
  * This factory's strategy uses a {@link WorkManager} to schedule the processing of the pipeline of message processors in a single
@@ -42,52 +49,67 @@ public class AsynchronousProcessingStrategyFactory implements ProcessingStrategy
       } catch (RegistrationException e) {
         throw new MuleRuntimeException(e);
       }
-    }, scheduler -> scheduler.stop(muleContext.getConfiguration().getShutdownTimeout(), MILLISECONDS),
-                                              new SynchronousProcessingStrategyFactory().create(muleContext));
+    }, scheduler -> scheduler.stop(muleContext.getConfiguration().getShutdownTimeout(), MILLISECONDS), muleContext);
   }
 
-  public static class AsynchronousProcessingStrategy implements ProcessingStrategy, Startable, Stoppable {
+  static class AsynchronousProcessingStrategy implements ProcessingStrategy, Startable, Stoppable {
 
     protected ProcessingStrategy synchronousProcessingStrategy;
 
     private Supplier<Scheduler> schedulerSupplier;
     private Consumer<Scheduler> schedulerStopper;
-
     private Scheduler scheduler;
-    private AsyncInterceptingMessageProcessor asyncMessageProcessor;
+    private MuleContext muleContext;
 
     public AsynchronousProcessingStrategy(Supplier<Scheduler> schedulerSupplier, Consumer<Scheduler> schedulerStopper,
-                                          ProcessingStrategy synchronousProcessingStrategy) {
+                                          MuleContext muleContext) {
       this.schedulerSupplier = schedulerSupplier;
       this.schedulerStopper = schedulerStopper;
-      this.synchronousProcessingStrategy = synchronousProcessingStrategy;
-    }
-
-    @Override
-    public void configureProcessors(List<Processor> processors, MessageProcessorChainBuilder chainBuilder) {
-      asyncMessageProcessor = createAsyncMessageProcessor();
-      if (processors.size() > 0) {
-        chainBuilder.chain(asyncMessageProcessor);
-        synchronousProcessingStrategy.configureProcessors(processors, chainBuilder);
-      }
-    }
-
-    protected AsyncInterceptingMessageProcessor createAsyncMessageProcessor() {
-      return new AsyncInterceptingMessageProcessor();
+      this.muleContext = muleContext;
     }
 
     @Override
     public void start() throws MuleException {
       this.scheduler = schedulerSupplier.get();
-      asyncMessageProcessor.setScheduler(scheduler);
+    }
+
+    public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
+                                                                   Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
+
+      // Conserve existing 3.x async processing strategy behaviuor:
+      // i) The request event is echoed rather than the the result of async processing returned
+      // ii) Any exceptions that occur due to async processing are not propagated upwards
+      return publisher -> from(publisher).concatMap(request -> just(request)
+          .doOnNext(event -> fireAsyncScheduledNotification(event, pipeline))
+          .publishOn(fromExecutorService(scheduler))
+          .transform(publisherFunction)
+          .map(response -> request)
+          .doOnNext(event -> fireAsyncCompleteNotification(event, pipeline, null))
+          .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(request, pipeline, e))
+          .onErrorResumeWith(MessagingException.class, pipeline.getExceptionListener())
+          .onErrorReturn(MessagingException.class, request));
     }
 
     @Override
     public void stop() throws MuleException {
       if (scheduler != null) {
         schedulerStopper.accept(scheduler);
-        asyncMessageProcessor.setScheduler(null);
       }
+    }
+
+    protected void fireAsyncScheduledNotification(Event event, Pipeline pipeline) {
+      muleContext.getNotificationManager()
+          .fireNotification(new AsyncMessageNotification(pipeline, event, null, PROCESS_ASYNC_SCHEDULED));
+    }
+
+    protected void fireAsyncCompleteNotification(Event event, Pipeline pipeline, MessagingException exception) {
+      // Async completed notification uses same event instance as async listener
+      muleContext.getNotificationManager()
+          .fireNotification(new AsyncMessageNotification(pipeline, event, null, PROCESS_ASYNC_COMPLETE, exception));
+    }
+
+    protected Scheduler getScheduler() {
+      return this.scheduler;
     }
   }
 }

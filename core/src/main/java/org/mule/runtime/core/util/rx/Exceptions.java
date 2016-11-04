@@ -7,6 +7,11 @@
 package org.mule.runtime.core.util.rx;
 
 import static reactor.core.Exceptions.propagate;
+import static reactor.core.Exceptions.unwrap;
+
+import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.core.api.DefaultMuleException;
+import org.mule.runtime.core.exception.MessagingException;
 
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -210,4 +215,13 @@ public class Exceptions {
 
     boolean testChecked(T t, U u) throws Throwable;
   }
+
+  public static MuleException rxExceptionToMuleException(Throwable throwable, boolean unwrapMessagingException) {
+    Throwable unwrapped = unwrap(throwable);
+    if (unwrapMessagingException && unwrapped instanceof MessagingException) {
+      unwrapped = unwrapped.getCause();
+    }
+    return unwrapped instanceof MuleException ? (MuleException) unwrapped : new DefaultMuleException(throwable);
+  }
+
 }
