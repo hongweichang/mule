@@ -309,7 +309,7 @@ final class ObjectTypeSchemaDelegate {
   }
 
   private void declareObjectField(ObjectFieldType field, ExtensionType extension, ExplicitGroup all) {
-    field.getValue().accept(builder.getParameterDeclarationVisitor(extension, all, asParameter(field)));
+    builder.declareAsParameter(field.getValue(), extension, all, asParameter(field));
   }
 
   private void registerPojoGlobalElements(DslElementSyntax typeDsl, ObjectType type, ObjectType baseType, String description) {

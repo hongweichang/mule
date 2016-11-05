@@ -10,10 +10,11 @@ import static java.util.Collections.emptySet;
 import static org.mule.metadata.internal.utils.MetadataTypeUtils.getDefaultValue;
 import static org.mule.runtime.dsl.api.component.AttributeDefinition.Builder.fromChildConfiguration;
 import static org.mule.runtime.dsl.api.component.AttributeDefinition.Builder.fromFixedValue;
-import static org.mule.runtime.dsl.api.component.ComponentBuildingDefinition.*;
+import static org.mule.runtime.dsl.api.component.ComponentBuildingDefinition.Builder;
 import static org.mule.runtime.dsl.api.component.TypeDefinition.fromType;
 import static org.mule.runtime.extension.api.declaration.type.TypeUtils.acceptsReferences;
 import static org.mule.runtime.extension.api.declaration.type.TypeUtils.getExpressionSupport;
+import static org.mule.runtime.extension.api.declaration.type.TypeUtils.isContent;
 import org.mule.metadata.api.model.ArrayType;
 import org.mule.metadata.api.model.DictionaryType;
 import org.mule.metadata.api.model.MetadataType;
@@ -21,10 +22,10 @@ import org.mule.metadata.api.model.ObjectFieldType;
 import org.mule.metadata.api.model.ObjectType;
 import org.mule.metadata.api.model.StringType;
 import org.mule.metadata.api.visitor.MetadataTypeVisitor;
+import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.config.ConfigurationException;
 import org.mule.runtime.extension.api.declaration.type.annotation.FlattenedTypeAnnotation;
-import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.extension.xml.dsl.api.DslElementSyntax;
 import org.mule.runtime.extension.xml.dsl.api.resolver.DslSyntaxResolver;
 import org.mule.runtime.module.extension.internal.config.dsl.ExtensionDefinitionParser;
@@ -96,6 +97,7 @@ public class ObjectTypeParameterParser extends ExtensionDefinitionParser {
       return;
     }
 
+    final boolean isContent = isContent(objectField);
     fieldType.accept(new MetadataTypeVisitor() {
 
       @Override
@@ -108,12 +110,12 @@ public class ObjectTypeParameterParser extends ExtensionDefinitionParser {
         if (fieldDsl.get().supportsChildDeclaration()) {
           addParameter(fieldName, fromChildConfiguration(String.class).withWrapperIdentifier(fieldName));
           addDefinition(baseDefinitionBuilder.copy()
-              .withIdentifier(fieldName)
-              .withTypeDefinition(fromType(String.class))
-              .withTypeConverter(value -> resolverOf(fieldName, stringType, value, defaultValue,
-                                                     expressionSupport, false,
-                                                     emptySet(), acceptsReferences))
-              .build());
+                            .withIdentifier(fieldName)
+                            .withTypeDefinition(fromType(String.class))
+                            .withTypeConverter(value -> resolverOf(fieldName, stringType, value, defaultValue,
+                                                                   expressionSupport, false,
+                                                                   emptySet(), acceptsReferences))
+                            .build());
         } else {
           defaultVisit(stringType);
         }
@@ -126,10 +128,14 @@ public class ObjectTypeParameterParser extends ExtensionDefinitionParser {
           return;
         }
 
+        if (parseAsContent(isContent, objectType)) {
+          return;
+        }
+
         if (!parsingContext.isRegistered(name, namespace)) {
           parsingContext.registerObjectType(name, namespace, type);
-          parseObjectParameter(fieldName, fieldName, objectType, defaultValue, expressionSupport, false, acceptsReferences,
-                               fieldDsl.get(), emptySet());
+          parseObjectParameter(fieldName, fieldName, objectType, defaultValue, expressionSupport,
+                               false, acceptsReferences, fieldDsl.get(), emptySet());
         } else {
           parseObject(fieldName, fieldName, objectType, defaultValue, expressionSupport, false, acceptsReferences,
                       fieldDsl.get(), emptySet());
@@ -138,14 +144,30 @@ public class ObjectTypeParameterParser extends ExtensionDefinitionParser {
 
       @Override
       public void visitArrayType(ArrayType arrayType) {
-        parseCollectionParameter(fieldName, fieldName, arrayType, defaultValue, expressionSupport, false, fieldDsl.get(),
-                                 emptySet());
+        if (!parseAsContent(isContent, arrayType)) {
+          parseCollectionParameter(fieldName, fieldName, arrayType, defaultValue, expressionSupport, false, fieldDsl.get(),
+                                   emptySet());
+        }
       }
 
       @Override
       public void visitDictionary(DictionaryType dictionaryType) {
-        parseMapParameters(fieldName, fieldName, dictionaryType, defaultValue, expressionSupport, false, fieldDsl.get(),
-                           emptySet());
+        if (!parseAsContent(isContent, dictionaryType)) {
+          parseMapParameters(fieldName, fieldName, dictionaryType, defaultValue, expressionSupport, false, fieldDsl.get(),
+                             emptySet());
+        }
+      }
+
+      private boolean parseAsContent(boolean isContent, MetadataType type) {
+        if (isContent) {
+          parseFromTextExpression(fieldName, fieldDsl.get(), () -> value -> resolverOf(fieldName, type, value, defaultValue,
+                                                                                       expressionSupport, false, emptySet(),
+                                                                                       false));
+
+          return true;
+        }
+
+        return false;
       }
     });
   }

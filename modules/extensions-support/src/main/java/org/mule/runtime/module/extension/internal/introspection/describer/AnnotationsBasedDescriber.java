@@ -13,12 +13,10 @@ import static org.mule.runtime.api.meta.ExpressionSupport.NOT_SUPPORTED;
 import static org.mule.runtime.api.meta.model.connection.ConnectionManagementType.CACHED;
 import static org.mule.runtime.api.meta.model.connection.ConnectionManagementType.NONE;
 import static org.mule.runtime.api.meta.model.connection.ConnectionManagementType.POOLING;
-import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.CONTENT;
-import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.PARAMETERIZATION;
-import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.PRIMARY_CONTENT;
 import static org.mule.runtime.api.util.Preconditions.checkArgument;
 import static org.mule.runtime.extension.api.annotation.Extension.DEFAULT_CONFIG_DESCRIPTION;
 import static org.mule.runtime.extension.api.annotation.Extension.DEFAULT_CONFIG_NAME;
+import static org.mule.runtime.extension.api.util.ExtensionModelUtils.purposeOf;
 import static org.mule.runtime.module.extension.internal.introspection.describer.MuleExtensionAnnotationParser.getExceptionEnricherFactory;
 import static org.mule.runtime.module.extension.internal.introspection.describer.MuleExtensionAnnotationParser.getExtension;
 import static org.mule.runtime.module.extension.internal.introspection.describer.MuleExtensionAnnotationParser.parseLayoutAnnotations;
@@ -51,7 +49,6 @@ import org.mule.runtime.api.meta.model.declaration.fluent.ParameterDeclarer;
 import org.mule.runtime.api.meta.model.declaration.fluent.ParameterizedDeclarer;
 import org.mule.runtime.api.meta.model.declaration.fluent.SourceDeclarer;
 import org.mule.runtime.api.meta.model.display.LayoutModel;
-import org.mule.runtime.api.meta.model.parameter.ParameterPurpose;
 import org.mule.runtime.core.util.ArrayUtils;
 import org.mule.runtime.core.util.CollectionUtils;
 import org.mule.runtime.extension.api.annotation.Configuration;
@@ -519,12 +516,12 @@ public final class AnnotationsBasedDescriber implements Describer {
             extensionParameter.isRequired() ? component.withRequiredParameter(extensionParameter.getAlias())
                 : component.withOptionalParameter(extensionParameter.getAlias())
                     .defaultingTo(extensionParameter.defaultValue().isPresent() ? extensionParameter.defaultValue().get() : null);
-        parameter.ofType(extensionParameter.getMetadataType(typeLoader));
 
-        parameter.describedAs(EMPTY);
+        parameter.ofType(extensionParameter.getMetadataType(typeLoader)).describedAs(EMPTY);
+
         parseParameterPurpose(extensionParameter, parameter);
         parseExpressionSupport(extensionParameter, parameter);
-        parseNotNull(extensionParameter, parameter);
+        parseNullSafe(extensionParameter, parameter);
         addTypeRestrictions(extensionParameter, parameter);
         parseLayout(extensionParameter, parameter);
         addImplementingTypeModelProperty(extensionParameter, parameter);
@@ -609,11 +606,7 @@ public final class AnnotationsBasedDescriber implements Describer {
   }
 
   private void parseParameterPurpose(ExtensionParameter extensionParameter, ParameterDeclarer parameter) {
-    ParameterPurpose purpose = extensionParameter.getAnnotation(Content.class)
-        .map(c -> c.primary() ? PRIMARY_CONTENT : CONTENT)
-        .orElse(PARAMETERIZATION);
-
-    parameter.forPurpose(purpose);
+    parameter.forPurpose(purposeOf(extensionParameter.getAnnotation(Content.class)));
   }
 
   private void parseExpressionSupport(ExtensionParameter extensionParameter, ParameterDeclarer parameter) {
@@ -623,7 +616,7 @@ public final class AnnotationsBasedDescriber implements Describer {
     }
   }
 
-  private void parseNotNull(ExtensionParameter extensionParameter, ParameterDeclarer parameter) {
+  private void parseNullSafe(ExtensionParameter extensionParameter, ParameterDeclarer parameter) {
     if (extensionParameter.isAnnotatedWith(NullSafe.class)) {
       if (extensionParameter.isRequired()) {
         throw new IllegalParameterModelDefinitionException(format("Parameter '%s' is required but annotated with '@%s', which is redundant",

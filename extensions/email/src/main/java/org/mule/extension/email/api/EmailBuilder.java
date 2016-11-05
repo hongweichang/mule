@@ -8,6 +8,7 @@ package org.mule.extension.email.api;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import org.mule.runtime.extension.api.annotation.param.Content;
 import org.mule.runtime.extension.api.annotation.param.Parameter;
 import org.mule.runtime.extension.api.annotation.param.Optional;
 
@@ -68,6 +69,7 @@ public class EmailBuilder {
    * the text body of the email.
    */
   @Optional
+  @Content(primary = true)
   @Parameter
   private EmailBody body;
 
@@ -81,8 +83,9 @@ public class EmailBuilder {
   /**
    * The headers that this email carry.
    */
-  @Optional
   @Parameter
+  @Optional
+  @Content
   private Map<String, String> headers;
 
   /**
