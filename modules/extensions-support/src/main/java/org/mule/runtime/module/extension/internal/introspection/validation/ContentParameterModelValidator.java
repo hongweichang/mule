@@ -8,10 +8,13 @@ package org.mule.runtime.module.extension.internal.introspection.validation;
 
 import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
+import static org.mule.runtime.api.meta.ExpressionSupport.NOT_SUPPORTED;
 import static org.mule.runtime.api.meta.model.parameter.ParameterPurpose.PRIMARY_CONTENT;
 import static org.mule.runtime.extension.api.annotation.param.Optional.PAYLOAD;
 import static org.mule.runtime.module.extension.internal.util.IntrospectionUtils.getComponentModelTypeName;
 import org.mule.runtime.api.meta.model.ExtensionModel;
+import org.mule.runtime.api.meta.model.config.ConfigurationModel;
+import org.mule.runtime.api.meta.model.connection.ConnectionProviderModel;
 import org.mule.runtime.api.meta.model.operation.OperationModel;
 import org.mule.runtime.api.meta.model.parameter.ParameterModel;
 import org.mule.runtime.api.meta.model.parameter.ParameterizedModel;
@@ -31,18 +34,38 @@ public class ContentParameterModelValidator implements ModelValidator {
     new IdempotentExtensionWalker() {
 
       @Override
+      public void onConfiguration(ConfigurationModel model) {
+        validateNoContent(extensionModel, model);
+      }
+
+      @Override
+      protected void onConnectionProvider(ConnectionProviderModel model) {
+        validateNoContent(extensionModel, model);
+      }
+
+      @Override
       protected void onOperation(OperationModel model) {
-        validate(extensionModel, model);
+        validateContent(extensionModel, model);
       }
 
       @Override
       protected void onSource(SourceModel model) {
-        validate(extensionModel, model);
+        validateContent(extensionModel, model);
       }
     }.walk(extensionModel);
   }
 
-  private void validate(ExtensionModel extensionModel, ParameterizedModel model) {
+  private void validateNoContent(ExtensionModel extensionModel, ParameterizedModel model) {
+    List<ParameterModel> contentParameters = getContentParameters(model);
+
+    if (!contentParameters.isEmpty()) {
+      throw modelException(extensionModel, model,
+                           format("which contains content parameters. Content parameters are not allowed on %s components",
+                                  getComponentModelTypeName(model)));
+    }
+  }
+
+  private void validateContent(ExtensionModel extensionModel, ParameterizedModel model) {
     List<ParameterModel> contentParameters = getContentParameters(model);
 
     if (contentParameters.isEmpty()) {
@@ -51,6 +74,21 @@ public class ContentParameterModelValidator implements ModelValidator {
 
     validatePrimaryContent(extensionModel, model, contentParameters);
     validateDsl(extensionModel, model, contentParameters);
+    validateExpressionSupport(extensionModel, model, contentParameters);
+  }
+
+  private void validateExpressionSupport(ExtensionModel extensionModel, ParameterizedModel model,
+                                         List<ParameterModel> contentParameters) {
+    List<ParameterModel> expressionLess = contentParameters.stream()
+        .filter(p -> p.getExpressionSupport() == NOT_SUPPORTED)
+        .collect(toList());
+
+    if (!expressionLess.isEmpty()) {
+      throw modelException(extensionModel, model,
+                           format("which contains content parameters which don't allow expressions. Expressions"
+                               + " are mandatory for all content parameters. Offending parameters are: [%s]",
+                                  join(expressionLess)));
+    }
   }
 
   private void validateDsl(ExtensionModel extensionModel, ParameterizedModel model, List<ParameterModel> contentParameters) {
@@ -96,8 +134,7 @@ public class ContentParameterModelValidator implements ModelValidator {
   private void validateDefaultsToPayload(ExtensionModel extensionModel, ParameterizedModel model, ParameterModel parameter) {
     if (!PAYLOAD.equals(parameter.getDefaultValue())) {
       throw modelException(extensionModel, model, format("which contains parameter '%s' which is set as primary content "
-          + "but does not default to the payload",
-                                                         parameter.getName()));
+          + "but does not default to the payload", parameter.getName()));
     }
   }
 
