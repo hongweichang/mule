@@ -131,7 +131,9 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
           just(request).map(event -> updateEventForAsync(event))
               .transform(processingStrategy.onPipeline((Pipeline) flowConstruct, delegate, messagingExceptionHandler))
               .onErrorResumeWith(MessagingException.class, messagingExceptionHandler)
-              .subscribe(event -> {}, throwable -> {});
+              .subscribe(event -> {
+              }, throwable -> {
+              });
           return request;
         });
   }

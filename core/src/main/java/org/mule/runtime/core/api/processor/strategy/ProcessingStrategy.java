@@ -33,7 +33,7 @@ public interface ProcessingStrategy {
   }
 
 
-    default Function<Publisher<Event>, Publisher<Event>> onProcessor(Processor messageProcessor,
+  default Function<Publisher<Event>, Publisher<Event>> onProcessor(Processor messageProcessor,
                                                                    Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
     return publisher -> from(publisher).transform(publisherFunction);
   }
