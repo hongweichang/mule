@@ -19,7 +19,9 @@
                 <httpn:query-params>
                     #[['query' : 'param']]
                 </httpn:query-params>
-                <httpn:headers>#[['X-Custom' : 'custom-value']]</httpn:headers>
+                <httpn:headers>
+                    #[['X-Custom' : 'custom-value']]
+                </httpn:headers>
             </httpn:request-builder>
         </httpn:request>
     </flow>

@@ -32,13 +32,21 @@ public class AttributeEvaluator {
   private AttributeType attributeType;
 
   public AttributeEvaluator(String attributeValue) {
-    this.attributeValue = attributeValue;
+    this.attributeValue = sanitize(attributeValue);
   }
 
   public AttributeEvaluator initialize(final ExpressionLanguage expressionLanguage) {
     this.expressionLanguage = expressionLanguage;
     resolveAttributeType();
     return this;
+  }
+
+  private String sanitize(String attributeValue) {
+    if (attributeValue != null) {
+      attributeValue = attributeValue.trim().replaceAll("\n", "").replaceAll("\r", "").replaceAll("\t", "");
+    }
+
+    return attributeValue;
   }
 
   private void resolveAttributeType() {

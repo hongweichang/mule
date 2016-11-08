@@ -37,11 +37,13 @@ public class TopLevelParameterObjectFactory extends AbstractExtensionObjectFacto
 
   private ObjectBuilder builder;
   private Class<Object> objectClass;
+  private final ObjectType objectType;
   private final ClassLoader classLoader;
 
   public TopLevelParameterObjectFactory(ObjectType type, ClassLoader classLoader, MuleContext muleContext) {
     super(muleContext);
     this.classLoader = classLoader;
+    this.objectType = type;
     withContextClassLoader(classLoader, () -> {
       objectClass = getType(type);
       builder = new DefaultObjectBuilder(objectClass);
@@ -73,6 +75,13 @@ public class TopLevelParameterObjectFactory extends AbstractExtensionObjectFacto
   }
 
   private void resolveParameters(Class<?> objectClass, ObjectBuilder builder) {
+    objectType.getFields().forEach(field -> {
+      String key = field.getKey().getName().getLocalPart();
+      if (getParameters().containsKey(key)) {
+        builder.addPropertyResolver(field, toValueResolver(getParameters().get(key)));
+      }
+    });
+
     // TODO: MULE-9453 this needs to not depend on fields exclusively
     for (Field field : getAllFields(objectClass)) {
       String key = getAliasName(field);

@@ -23,7 +23,7 @@ public abstract class HttpListenerResponseBuilder extends HttpMessageBuilder {
    * The body of the response message
    */
   @Parameter
-  @Optional
+  //@Optional
   @Content(primary = true)
   private Object body;
 

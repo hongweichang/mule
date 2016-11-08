@@ -23,6 +23,7 @@ import org.mule.runtime.api.meta.model.ModelProperty;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.util.ValueHolder;
+import org.mule.runtime.extension.api.annotation.param.Content;
 import org.mule.runtime.extension.api.annotation.param.NullSafe;
 import org.mule.runtime.extension.api.annotation.param.Optional;
 import org.mule.runtime.extension.api.annotation.param.Parameter;
@@ -77,7 +78,8 @@ public class NullSafeValueResolverWrapper<T> implements ValueResolver<T> {
         ResolverSet resolverSet = new ResolverSet();
         getAnnotatedFields(clazz, Parameter.class).forEach(field -> {
           Optional optional = field.getAnnotation(Optional.class);
-          if (optional == null) {
+          Content content = field.getAnnotation(Content.class);
+          if (optional == null && content == null) {
             throw new IllegalParameterModelDefinitionException(
                                                                format("Class '%s' cannot be used with '@%s' parameter since it contains non optional fields",
                                                                       clazz.getName(), NullSafe.class.getSimpleName()));
