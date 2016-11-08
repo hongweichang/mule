@@ -124,16 +124,11 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
         .doOnNext(checkedConsumer(event -> assertNotTransactional(event)))
         .doOnNext(event -> warnConsumablePayload(event.getMessage()))
         .doOnNext(request -> {
-          try {
-            just(request).map(event -> updateEventForAsync(event))
-                .transform(
-                           flowConstruct instanceof Pipeline ? processingStrategy.onPipeline((Pipeline) flowConstruct, delegate)
-                               : delegate)
-                .subscribeOn(fromExecutorService(muleContext.getRegistry().lookupObject(SchedulerService.class)
-                    .cpuLightScheduler()));
-          } catch (RegistrationException e) {
-            e.printStackTrace();
-          }
+          just(request).map(event -> updateEventForAsync(event))
+              .transform(
+                         flowConstruct instanceof Pipeline ? processingStrategy.onPipeline((Pipeline) flowConstruct, delegate)
+                             : delegate)
+              .subscribe();
         });
   }
 
