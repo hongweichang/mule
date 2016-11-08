@@ -71,4 +71,16 @@ public final class ImplicitConnectionProviderValueResolver implements ValueResol
   public boolean isDynamic() {
     return false;
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+    //Do nothing
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }

@@ -57,6 +57,18 @@ public final class NativeQueryParameterValueResolver implements ValueResolver<St
     return false;
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
   private QueryTranslator instantiateTranslator(Class<? extends QueryTranslator> translator) {
     try {
       return translator.newInstance();

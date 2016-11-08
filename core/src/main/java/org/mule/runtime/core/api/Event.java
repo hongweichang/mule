@@ -23,8 +23,10 @@ import org.mule.runtime.core.api.transformer.TransformerException;
 import org.mule.runtime.core.config.DefaultMuleConfiguration;
 import org.mule.runtime.core.message.DefaultEventBuilder;
 import org.mule.runtime.core.message.GroupCorrelation;
+import org.mule.runtime.core.policy.OperationPolicyInstance;
 
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -250,6 +252,8 @@ public interface Event extends MuleEvent {
   @Deprecated
   String getLegacyCorrelationId();
 
+  List<OperationPolicyInstance> getPolicyInstances();
+
   /**
    * Create new {@link Builder}.
    *
@@ -421,13 +425,14 @@ public interface Event extends MuleEvent {
     @Deprecated
     Builder refreshSync();
 
+    Builder attachPolicyInstance(OperationPolicyInstance policyInstance);
+
     /**
      * Build a new {@link Event} based on the state configured in the {@link Builder}.
      *
      * @return new {@link Event} instance.
      */
     Event build();
-
   }
 
   public static <T> T getVariableValueOrNull(String key, Event event) {

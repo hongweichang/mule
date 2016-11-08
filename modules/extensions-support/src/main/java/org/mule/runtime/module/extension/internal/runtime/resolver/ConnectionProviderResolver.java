@@ -42,6 +42,18 @@ public class ConnectionProviderResolver implements ValueResolver<ConnectionProvi
     return valueResolver.isDynamic();
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+    //Do nothing
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
   public void setOwnerConfigName(String ownerConfigName) {
     objectBuilder.setOwnerConfigName(ownerConfigName);
   }

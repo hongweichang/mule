@@ -70,4 +70,16 @@ public class RegistryLookupValueResolver<T> implements ValueResolver<T> {
   public boolean isDynamic() {
     return false;
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }

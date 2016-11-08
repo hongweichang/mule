@@ -68,6 +68,18 @@ public class ResolverSet implements ValueResolver<ResolverSetResult> {
     return dynamic;
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
   /**
    * Evaluates all the added {@link ValueResolver}s and returns the results into a {@link ResolverSetResult}
    *

@@ -16,6 +16,7 @@ import org.mule.compatibility.transport.socket.api.TcpServerSocketProperties;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.core.api.context.WorkManagerSource;
 import org.mule.runtime.core.config.i18n.CoreMessages;
+import org.mule.runtime.core.policy.PolicyManager;
 import org.mule.runtime.module.http.internal.HttpMessageLogger;
 import org.mule.runtime.module.http.internal.listener.HttpListenerRegistry;
 import org.mule.runtime.module.http.internal.listener.HttpServerManager;
@@ -64,10 +65,10 @@ public class GrizzlyServerManager implements HttpServerManager {
   private boolean transportStarted;
 
   public GrizzlyServerManager(String threadNamePrefix, HttpListenerRegistry httpListenerRegistry,
-                              TcpServerSocketProperties serverSocketProperties)
+                              TcpServerSocketProperties serverSocketProperties, PolicyManager policyManager)
       throws IOException {
     this.httpListenerRegistry = httpListenerRegistry;
-    requestHandlerFilter = new GrizzlyRequestDispatcherFilter(httpListenerRegistry);
+    requestHandlerFilter = new GrizzlyRequestDispatcherFilter(httpListenerRegistry, policyManager);
     sslFilterDelegate = new GrizzlyAddressDelegateFilter<>();
     httpServerFilterDelegate = new GrizzlyAddressDelegateFilter<>();
 

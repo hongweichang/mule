@@ -11,6 +11,7 @@ import org.mule.runtime.api.meta.model.operation.OperationModel;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.api.processor.InterceptingMessageProcessor;
+import org.mule.runtime.core.policy.PolicyManager;
 import org.mule.runtime.core.streaming.Consumer;
 import org.mule.runtime.core.streaming.ConsumerIterator;
 import org.mule.runtime.core.streaming.ListConsumer;
@@ -22,6 +23,8 @@ import org.mule.runtime.module.extension.internal.manager.ExtensionManagerAdapte
 import org.mule.runtime.module.extension.internal.runtime.ExecutionContextAdapter;
 import org.mule.runtime.module.extension.internal.runtime.resolver.ResolverSet;
 import org.mule.runtime.module.extension.internal.runtime.streaming.PagingProviderProducer;
+
+import java.util.Collections;
 
 /**
  * A specialization of {@link OperationMessageProcessor} which also implements {@link InterceptingMessageProcessor}.
@@ -35,8 +38,9 @@ public class PagedOperationMessageProcessor extends OperationMessageProcessor {
                                         ConfigurationProvider configurationProvider,
                                         String target,
                                         ResolverSet resolverSet,
-                                        ExtensionManagerAdapter extensionManager) {
-    super(extensionModel, operationModel, configurationProvider, target, resolverSet, extensionManager);
+                                        ExtensionManagerAdapter extensionManager,
+                                        PolicyManager policyManager) {
+    super(extensionModel, operationModel, configurationProvider, target, resolverSet, extensionManager, Collections.emptyList(), policyManager);
   }
 
   @Override

@@ -44,6 +44,18 @@ public final class NestedProcessorValueResolver extends AbstractNestedProcessorV
     return toNestedProcessor(messageProcessor, event, muleContext);
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
   public void setMuleContext(MuleContext muleContext) {
     this.muleContext = muleContext;
   }

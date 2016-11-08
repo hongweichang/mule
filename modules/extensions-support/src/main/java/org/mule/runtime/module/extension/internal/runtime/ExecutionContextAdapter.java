@@ -70,4 +70,6 @@ public interface ExecutionContextAdapter<M extends ComponentModel> extends Execu
    * @return The {@link MuleContext} on which the operation is being executed
    */
   MuleContext getMuleContext();
+
+  void setEvent(Event event);
 }

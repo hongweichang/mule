@@ -6,11 +6,13 @@
  */
 package org.mule.runtime.core.execution;
 
+import java.util.Map;
+
 /**
  * Base class which provides a simplified view of {@link CompletionHandler} for cases
  * in which the task to be completed is assumed to be blocking
  * <p>
- * The {@link #onCompletion(Object, ExceptionCallback)} method has a final implementation
+ * The {@link CompletionHandler#onCompletion(Object, Map, ExceptionCallback)} method has a final implementation
  * which delegates into {@link #doOnCompletion(Object)} and automatically catches any exception
  * and channels it through the {@link ExceptionCallback}
  *

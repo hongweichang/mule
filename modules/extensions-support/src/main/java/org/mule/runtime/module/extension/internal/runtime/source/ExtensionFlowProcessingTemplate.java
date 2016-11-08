@@ -6,32 +6,59 @@
  */
 package org.mule.runtime.module.extension.internal.runtime.source;
 
+import org.mule.runtime.api.message.Message;
 import org.mule.runtime.core.execution.CompletionHandler;
 import org.mule.runtime.api.message.MuleEvent;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.api.processor.Processor;
-import org.mule.runtime.core.execution.AsyncResponseFlowProcessingPhaseTemplate;
+import org.mule.runtime.core.execution.ExtensionFlowProcessingPhaseTemplate;
 import org.mule.runtime.core.execution.ResponseCompletionCallback;
 
-final class ExtensionFlowProcessingTemplate implements AsyncResponseFlowProcessingPhaseTemplate {
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
-  private final Event event;
+final class ExtensionFlowProcessingTemplate implements ExtensionFlowProcessingPhaseTemplate {
+
+  private final Message message;
   private final Processor messageProcessor;
   private final CompletionHandler<Event, MessagingException> completionHandler;
+  private final Optional<Object> messagePolicyDescriptor;
 
-  ExtensionFlowProcessingTemplate(Event event,
+  ExtensionFlowProcessingTemplate(Message message,
                                   Processor messageProcessor,
-                                  CompletionHandler<Event, MessagingException> completionHandler) {
-    this.event = event;
+                                  CompletionHandler<Event, MessagingException> completionHandler, Optional<Object> messagePolicyDescriptor) {
+    this.message = message;
     this.messageProcessor = messageProcessor;
     this.completionHandler = completionHandler;
+    this.messagePolicyDescriptor = messagePolicyDescriptor;
+  }
+
+  public Optional<Object> getMessagePolicyDescriptor()
+  {
+    return messagePolicyDescriptor;
   }
 
   @Override
-  public Event getEvent() throws MuleException {
-    return event;
+  public Function<Event, Map<String, Object>> getSuccessfulExecutionResponseParametersFunction()
+  {
+    if (completionHandler instanceof SourceAdapter.SourceCompletionHandler) {
+      return (event -> ((SourceAdapter.SourceCompletionHandler) completionHandler).createResponseParameters(event));
+    }
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Function<Event, Map<String, Object>> getFailedExecutionResponseParametersFunction()
+  {
+    return null;
+  }
+
+  @Override
+  public Message getMessage() throws MuleException {
+    return message;
   }
 
   @Override
@@ -40,18 +67,19 @@ final class ExtensionFlowProcessingTemplate implements AsyncResponseFlowProcessi
   }
 
   @Override
-  public void sendResponseToClient(Event event, ResponseCompletionCallback responseCompletionCallback)
-      throws MuleException {
+  public void sendResponseToClient(Event event, Map<String, Object> parameters, ResponseCompletionCallback responseCompletionCallback) throws MuleException
+  {
     ExtensionSourceExceptionCallback exceptionCallback =
-        new ExtensionSourceExceptionCallback(responseCompletionCallback, event, completionHandler::onFailure);
-    runAndNotify(() -> completionHandler.onCompletion(event, exceptionCallback), this.event, responseCompletionCallback);
+            new ExtensionSourceExceptionCallback(responseCompletionCallback, event, completionHandler::onFailure);
+    ((SourceAdapter.SourceCompletionHandler) completionHandler).setResponseParameters(parameters);
+    runAndNotify(() -> completionHandler.onCompletion(event, exceptionCallback), event, responseCompletionCallback);
   }
 
   @Override
   public void sendFailureResponseToClient(MessagingException messagingException,
                                           ResponseCompletionCallback responseCompletionCallback)
       throws MuleException {
-    runAndNotify(() -> completionHandler.onFailure(messagingException), event, responseCompletionCallback);
+    runAndNotify(() -> completionHandler.onFailure(messagingException), messagingException.getEvent(), responseCompletionCallback);
   }
 
   private void runAndNotify(Runnable runnable, MuleEvent event, ResponseCompletionCallback responseCompletionCallback) {

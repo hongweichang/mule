@@ -49,4 +49,16 @@ public class ObjectBuilderValueResolver<T> implements ValueResolver<T> {
   public boolean isDynamic() {
     return builder.isDynamic();
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }

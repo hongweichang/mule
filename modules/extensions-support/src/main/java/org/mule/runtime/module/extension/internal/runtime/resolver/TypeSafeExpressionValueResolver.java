@@ -111,6 +111,18 @@ public class TypeSafeExpressionValueResolver<T> implements ValueResolver<T> {
     return true;
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+    resolverSetVisitor.setConfigurationValue(evaluator.getRawValue());
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+    parameterResolver.resolve(null, evaluator.getRawValue(), expectedType);
+  }
+
   private interface EvaluatorDelegate {
 
     Object resolveValue(Event event);

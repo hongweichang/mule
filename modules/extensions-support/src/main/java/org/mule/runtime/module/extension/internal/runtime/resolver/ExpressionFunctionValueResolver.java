@@ -40,4 +40,16 @@ public final class ExpressionFunctionValueResolver<T> implements ValueResolver<F
     return false;
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
 }

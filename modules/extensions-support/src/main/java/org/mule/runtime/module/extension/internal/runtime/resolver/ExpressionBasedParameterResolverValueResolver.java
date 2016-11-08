@@ -45,4 +45,16 @@ public class ExpressionBasedParameterResolverValueResolver<T> implements ValueRe
   public boolean isDynamic() {
     return true;
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+    resolverSetVisitor.setConfigurationValue(exp);
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }

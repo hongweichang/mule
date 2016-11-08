@@ -39,11 +39,13 @@ import org.mule.runtime.extension.api.runtime.source.SourceCallback;
 import org.mule.runtime.extension.api.runtime.source.SourceCallbackContext;
 import org.mule.runtime.module.extension.internal.model.property.SourceCallbackModelProperty;
 import org.mule.runtime.module.extension.internal.runtime.resolver.ResolverSet;
+import org.mule.runtime.module.extension.internal.runtime.resolver.ResolverSetResult;
 import org.mule.runtime.module.extension.internal.util.FieldSetter;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -116,17 +118,18 @@ public final class SourceAdapter implements Startable, Stoppable, FlowConstructA
 
   private SourceCallbackExecutor getMethodExecutor(Optional<Method> method, ResolverSet parameters) {
     return method.map(m -> (SourceCallbackExecutor) new ReflectiveSourceCallbackExecutor(extensionModel, configurationInstance,
-                                                                                         sourceModel, source, m, parameters,
+                                                                                         sourceModel, source, m,
                                                                                          muleContext))
         .orElse(new NullSourceCallbackExecutor());
   }
 
 
-  private class SourceCompletionHandler implements CompletionHandler<Event, MessagingException> {
+  public class SourceCompletionHandler implements CompletionHandler<Event, MessagingException> {
 
     private final SourceCallbackExecutor onSuccessExecutor;
     private final SourceCallbackExecutor onErrorExecutor;
     private final SourceCallbackContext context;
+    private Map<String, Object> responseParameters;
 
     public SourceCompletionHandler(SourceCallbackExecutor onSuccessExecutor,
                                    SourceCallbackExecutor onErrorExecutor,
@@ -138,12 +141,12 @@ public final class SourceAdapter implements Startable, Stoppable, FlowConstructA
 
     @Override
     public void onCompletion(Event result, ExceptionCallback exceptionCallback) {
-      safely(() -> onSuccessExecutor.execute(result, context), exceptionCallback);
+      safely(() -> onSuccessExecutor.execute(result, responseParameters, context), exceptionCallback);
     }
 
     @Override
     public void onFailure(MessagingException exception) {
-      safely(() -> onErrorExecutor.execute(exception.getEvent(), context), callbackException -> {
+      safely(() -> onErrorExecutor.execute(exception.getEvent(), responseParameters, context), callbackException -> {
         throw new MuleRuntimeException(createStaticMessage(format(
                                                                   "Found exception trying to handle error from source '%s'",
                                                                   sourceModel.getName())),
@@ -157,6 +160,24 @@ public final class SourceAdapter implements Startable, Stoppable, FlowConstructA
       } catch (Throwable e) {
         exceptionCallback.onException(e);
       }
+    }
+
+    public Map<String, Object> createResponseParameters(Event event)
+    {
+      try
+      {
+        ResolverSetResult parameters = SourceAdapter.this.successCallbackParameters.resolve(event);
+        return parameters.asMap();
+      }
+      catch (MuleException e)
+      {
+        throw new MuleRuntimeException(e);
+      }
+    }
+
+    public void setResponseParameters(Map<String, Object> parameters)
+    {
+      this.responseParameters = parameters;
     }
   }
 

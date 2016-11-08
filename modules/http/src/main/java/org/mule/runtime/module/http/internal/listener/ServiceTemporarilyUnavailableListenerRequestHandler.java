@@ -8,21 +8,19 @@ package org.mule.runtime.module.http.internal.listener;
 
 import static org.mule.runtime.module.http.api.HttpConstants.HttpStatus.SERVICE_UNAVAILABLE;
 
+import org.mule.extension.http.internal.listener.HttpResponseFactory;
+import org.mule.runtime.core.execution.MessageProcessingManager;
+
+import java.nio.charset.Charset;
+
 /**
  * Request handle for request calls to paths with no listener configured.
  */
 public class ServiceTemporarilyUnavailableListenerRequestHandler extends ErrorRequestHandler {
 
-  private static ServiceTemporarilyUnavailableListenerRequestHandler instance =
-      new ServiceTemporarilyUnavailableListenerRequestHandler();
-
-  private ServiceTemporarilyUnavailableListenerRequestHandler() {
-    super(SERVICE_UNAVAILABLE.getStatusCode(), SERVICE_UNAVAILABLE.getReasonPhrase(),
-          "Service not available for request uri: %s");
-  }
-
-  public static ServiceTemporarilyUnavailableListenerRequestHandler getInstance() {
-    return instance;
+  protected ServiceTemporarilyUnavailableListenerRequestHandler(Charset defaultEncoding, MessageProcessingManager messageProcessingManager, HttpResponseFactory httpResponseFactory) {
+    super(defaultEncoding, SERVICE_UNAVAILABLE.getStatusCode(), SERVICE_UNAVAILABLE.getReasonPhrase(),
+          "Service not available for request uri: %s", messageProcessingManager, httpResponseFactory);
   }
 
 }

@@ -14,6 +14,7 @@ import static org.mule.runtime.module.http.api.HttpHeaders.Names.EXPECT;
 import static org.mule.runtime.module.http.api.HttpHeaders.Values.CONTINUE;
 import static org.mule.runtime.module.http.internal.listener.grizzly.MuleSslFilter.SSL_SESSION_ATTRIBUTE_KEY;
 
+import org.mule.runtime.core.policy.PolicyManager;
 import org.mule.runtime.module.http.internal.domain.InputStreamHttpEntity;
 import org.mule.runtime.module.http.internal.domain.request.ClientConnection;
 import org.mule.runtime.module.http.internal.domain.request.HttpRequestContext;
@@ -41,9 +42,11 @@ import org.glassfish.grizzly.http.HttpResponsePacket;
 public class GrizzlyRequestDispatcherFilter extends BaseFilter {
 
   private final RequestHandlerProvider requestHandlerProvider;
+  private final PolicyManager policyManager;
 
-  GrizzlyRequestDispatcherFilter(final RequestHandlerProvider requestHandlerProvider) {
+  GrizzlyRequestDispatcherFilter(final RequestHandlerProvider requestHandlerProvider, PolicyManager policyManager) {
     this.requestHandlerProvider = requestHandlerProvider;
+    this.policyManager = policyManager;
   }
 
   @Override
@@ -73,19 +76,16 @@ public class GrizzlyRequestDispatcherFilter extends BaseFilter {
     final GrizzlyHttpRequestAdapter httpRequest = new GrizzlyHttpRequestAdapter(ctx, httpContent);
     HttpRequestContext requestContext = createRequestContext(ctx, scheme, httpRequest);
     final RequestHandler requestHandler = requestHandlerProvider.getRequestHandler(ip, port, httpRequest);
-    requestHandler.handleRequest(requestContext, new HttpResponseReadyCallback() {
 
-      @Override
-      public void responseReady(HttpResponse httpResponse, ResponseStatusCallback responseStatusCallback) {
-        try {
-          if (httpResponse.getEntity() instanceof InputStreamHttpEntity) {
-            new ResponseStreamingCompletionHandler(ctx, request, httpResponse, responseStatusCallback).start();
-          } else {
-            new ResponseCompletionHandler(ctx, request, httpResponse, responseStatusCallback).start();
-          }
-        } catch (Exception e) {
-          responseStatusCallback.responseSendFailure(e);
+    requestHandler.handleRequest(requestContext, (httpResponse, responseStatusCallback) -> {
+      try {
+        if (httpResponse.getEntity() instanceof InputStreamHttpEntity) {
+          new ResponseStreamingCompletionHandler(ctx, request, httpResponse, responseStatusCallback).start();
+        } else {
+          new ResponseCompletionHandler(ctx, request, httpResponse, responseStatusCallback).start();
         }
+      } catch (Exception e) {
+        responseStatusCallback.responseSendFailure(e);
       }
     });
     return ctx.getSuspendAction();

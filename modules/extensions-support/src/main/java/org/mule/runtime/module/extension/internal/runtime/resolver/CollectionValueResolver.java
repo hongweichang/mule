@@ -84,6 +84,18 @@ public final class CollectionValueResolver<T> implements ValueResolver<Collectio
     return hasAnyDynamic(resolvers);
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
   private Collection<T> instantiateCollection() {
     try {
       return collectionType.newInstance();

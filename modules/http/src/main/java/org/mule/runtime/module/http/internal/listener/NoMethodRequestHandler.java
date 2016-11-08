@@ -8,16 +8,15 @@ package org.mule.runtime.module.http.internal.listener;
 
 import static org.mule.runtime.module.http.api.HttpConstants.HttpStatus.METHOD_NOT_ALLOWED;
 
+import org.mule.extension.http.internal.listener.HttpResponseFactory;
+import org.mule.runtime.core.execution.MessageProcessingManager;
+
+import java.nio.charset.Charset;
+
 public class NoMethodRequestHandler extends ErrorRequestHandler {
 
-  private static NoMethodRequestHandler instance = new NoMethodRequestHandler();
-
-  private NoMethodRequestHandler() {
-    super(METHOD_NOT_ALLOWED.getStatusCode(), METHOD_NOT_ALLOWED.getReasonPhrase(), "Method not allowed for endpoint: %s");
-  }
-
-  public static NoMethodRequestHandler getInstance() {
-    return instance;
+  protected NoMethodRequestHandler(Charset encoding, MessageProcessingManager messageProcessingManager, HttpResponseFactory httpResponseFactory) {
+    super(encoding, METHOD_NOT_ALLOWED.getStatusCode(), METHOD_NOT_ALLOWED.getReasonPhrase(), "Method not allowed for endpoint: %s", messageProcessingManager, httpResponseFactory);
   }
 
 }

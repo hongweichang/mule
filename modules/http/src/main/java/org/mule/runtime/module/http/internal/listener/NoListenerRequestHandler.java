@@ -8,21 +8,19 @@ package org.mule.runtime.module.http.internal.listener;
 
 import static org.mule.runtime.module.http.api.HttpConstants.HttpStatus.NOT_FOUND;
 
+import org.mule.extension.http.internal.listener.HttpResponseFactory;
+import org.mule.runtime.core.execution.MessageProcessingManager;
+
+import java.nio.charset.Charset;
+
 /**
  * Request handle for request calls to paths with no listener configured.
  */
 public class NoListenerRequestHandler extends ErrorRequestHandler {
 
-  public static final String RESOURCE_NOT_FOUND = "Resource not found.";
-
-  private static NoListenerRequestHandler instance = new NoListenerRequestHandler();
-
-  private NoListenerRequestHandler() {
-    super(NOT_FOUND.getStatusCode(), NOT_FOUND.getReasonPhrase(), "No listener for endpoint: %s");
-  }
-
-  public static NoListenerRequestHandler getInstance() {
-    return instance;
+  protected NoListenerRequestHandler(Charset encoding, MessageProcessingManager messageProcessingManager, HttpResponseFactory httpResponseFactory)
+  {
+    super(encoding, NOT_FOUND.getStatusCode(), NOT_FOUND.getReasonPhrase(), "No listener for endpoint: %s", messageProcessingManager, httpResponseFactory);
   }
 
 }

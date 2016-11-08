@@ -100,6 +100,18 @@ public final class MapValueResolver<K, V> implements ValueResolver<Map<K, V>> {
     }
   }
 
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
+
   private Map<K, V> instantiateMap() {
     try {
       return mapType.newInstance();

@@ -11,6 +11,9 @@ import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.api.exception.MuleException;
 
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * Template methods for {@link MessageSource} specific behavior during flow execution.
  */

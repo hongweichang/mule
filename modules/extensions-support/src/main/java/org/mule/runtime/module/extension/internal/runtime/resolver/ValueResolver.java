@@ -33,4 +33,7 @@ public interface ValueResolver<T> {
    */
   boolean isDynamic();
 
+  void accept(ResolverSetVisitor resolverSetVisitor);
+
+  void resolve(ShittyParameterResolver parameterResolver);
 }

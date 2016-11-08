@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:httpn="http://www.mulesoft.org/schema/mule/httpn"
+      xmlns:http-policy="http://www.mulesoft.org/schema/mule/http-policy"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xsi:schemaLocation="
+               http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+               http://www.mulesoft.org/schema/mule/httpn http://www.mulesoft.org/schema/mule/httpn/current/mule-httpn.xsd
+               http://www.mulesoft.org/schema/mule/http-policy http://www.mulesoft.org/schema/mule/http-policy/current/mule-http-policy.xsd">
+
+    <httpn:listener-config name="proxyConfig">
+        <httpn:listener-connection host="localhost" port="${proxyPort}"/>
+    </httpn:listener-config>
+
+    <httpn:request-config name="requestConfig">
+        <httpn:request-connection host="google.com" port="80"/>
+    </httpn:request-config>
+
+    <flow name="proxyTemplate">
+        <httpn:listener config-ref="proxyConfig" path="/*" responseStreamingMode="AUTO" parseRequest="false">
+            <httpn:response-builder statusCode="#[message.getAttributes().getStatusCode()]"
+                                    reasonPhrase="#[message.getAttributes().getReasonPhrase()]"
+                                    headersRef="#[message.getAttributes().getHeaders()]" />
+        </httpn:listener>
+
+        <logger message="Logger in the flow with payload #[payload]"/>
+
+        <httpn:request config-ref="requestConfig" method="GET" path="/" parseResponse="false">
+            <httpn:request-builder>
+                <httpn:headers>
+                    <httpn:header key="User" value="Pepito"/>
+                </httpn:headers>
+            </httpn:request-builder>
+        </httpn:request>
+    </flow>
+
+
+
+    <http-policy:policy>
+        <http-policy:source>
+            <set-payload value="myValue"/>
+            <set-payload value="myValue"/>
+            <http-policy:execute-next/>
+            <set-payload value="newValue"/>
+        </http-policy:source>
+        <http-policy:request>
+            <set-payload value="myNewRequestValue"/>
+            <http-policy:execute-next/>
+        </http-policy:request>
+    </http-policy:policy>
+
+</mule>

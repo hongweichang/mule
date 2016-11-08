@@ -59,6 +59,7 @@ import org.mule.runtime.extension.api.runtime.InterceptorFactory;
 import org.mule.runtime.extension.api.runtime.operation.Interceptor;
 import org.mule.runtime.extension.api.runtime.operation.OperationExecutorFactory;
 import org.mule.runtime.extension.api.runtime.operation.Result;
+import org.mule.runtime.extension.api.runtime.operation.OperationParametersResolverFactory;
 import org.mule.runtime.extension.api.runtime.source.SourceFactory;
 import org.mule.runtime.extension.api.tx.OperationTransactionalAction;
 import org.mule.runtime.module.extension.internal.model.property.ConfigurationFactoryModelProperty;
@@ -69,6 +70,7 @@ import org.mule.runtime.module.extension.internal.model.property.InterceptorsMod
 import org.mule.runtime.module.extension.internal.model.property.MetadataResolverFactoryModelProperty;
 import org.mule.runtime.module.extension.internal.model.property.NullSafeModelProperty;
 import org.mule.runtime.module.extension.internal.model.property.OperationExecutorModelProperty;
+import org.mule.runtime.module.extension.internal.model.property.OperationParametersResolverModelProperty;
 import org.mule.runtime.module.extension.internal.model.property.RequireNameField;
 import org.mule.runtime.module.extension.internal.model.property.SourceFactoryModelProperty;
 import org.mule.runtime.module.extension.internal.runtime.execution.OperationExecutorFactoryWrapper;
@@ -435,6 +437,20 @@ public class MuleExtensionUtils {
                                                                                         .getSimpleName())));
 
     return new OperationExecutorFactoryWrapper(executorFactory, createInterceptors(operationModel));
+  }
+
+  public static OperationParametersResolverFactory getOperationParametersResolverFactory(OperationModel operationModel) {
+    //TODO add same logic as with getOperationExecutorFactory
+    OperationParametersResolverFactory parametersResolverFactory =
+            fromModelProperty(operationModel,
+                              OperationParametersResolverModelProperty.class,
+                              OperationParametersResolverModelProperty::getOperationParametersResolverFactory,
+                              () -> new IllegalOperationModelDefinitionException(format("Operation '%s' does not provide a %s",
+                                                                                        operationModel.getName(),
+                                                                                        OperationExecutorFactory.class
+                                                                                                .getSimpleName())));
+
+    return parametersResolverFactory;
   }
 
   /**

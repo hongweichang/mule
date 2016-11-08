@@ -6,6 +6,8 @@
  */
 package org.mule.runtime.core.execution;
 
+import java.util.Map;
+
 /**
  * Handles the result of asynchronous processing.
  *

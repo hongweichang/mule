@@ -48,6 +48,7 @@
         <module>tomcat</module>
         <module>tooling-support</module>
         <module>xml</module>
+        <module>http-policy</module>
     </modules>
 
     <build>

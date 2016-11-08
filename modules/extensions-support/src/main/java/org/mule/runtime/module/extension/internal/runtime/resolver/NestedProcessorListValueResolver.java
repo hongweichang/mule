@@ -45,4 +45,16 @@ public class NestedProcessorListValueResolver extends AbstractNestedProcessorVal
   public boolean isDynamic() {
     return false;
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }

@@ -6,7 +6,9 @@
  */
 package org.mule.runtime.module.http.internal.listener.async;
 
+import org.mule.runtime.api.message.Message;
 import org.mule.runtime.module.http.internal.domain.request.HttpRequestContext;
+import org.mule.runtime.module.http.internal.listener.HttpRequestParsingException;
 
 /**
  * Handler for an incoming http request that allows to send the http response asynchronously.
@@ -20,5 +22,7 @@ public interface RequestHandler {
    * @param responseCallback callback to call when the response content is ready.
    */
   void handleRequest(HttpRequestContext requestContext, HttpResponseReadyCallback responseCallback);
+
+  Message createMessage(HttpRequestContext requestContext) throws HttpRequestParsingException;
 
 }

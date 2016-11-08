@@ -7,19 +7,24 @@
 package org.mule.runtime.module.http.internal.listener;
 
 import static org.mule.runtime.module.http.internal.HttpParser.normalizePathWithSpacesOrEncodedSpaces;
+import org.mule.extension.http.api.HttpStreamingType;
+import org.mule.extension.http.internal.listener.HttpResponseFactory;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.util.Preconditions;
 import org.mule.runtime.core.config.i18n.CoreMessages;
+import org.mule.runtime.core.execution.MessageProcessingManager;
+import org.mule.runtime.core.internal.transformer.simple.ObjectToByteArray;
+import org.mule.runtime.core.util.StringUtils;
 import org.mule.runtime.module.http.internal.domain.request.HttpRequest;
 import org.mule.runtime.module.http.internal.listener.async.RequestHandler;
 import org.mule.runtime.module.http.internal.listener.matcher.ListenerRequestMatcher;
-import org.mule.runtime.api.util.Preconditions;
-import org.mule.runtime.core.util.StringUtils;
 
 import com.google.common.base.Joiner;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,10 +40,21 @@ public class HttpListenerRegistry implements RequestHandlerProvider {
 
   private static final String WILDCARD_CHARACTER = "*";
   private static final String SLASH = "/";
+  private final NoListenerRequestHandler noListenerRequestHandler;
+  private final NoMethodRequestHandler noMethodRequestHandler;
+  private final ServiceTemporarilyUnavailableListenerRequestHandler serviceTemporarlyUnavailableRequestHandler;
   private Logger logger = LoggerFactory.getLogger(getClass());
 
   private final ServerAddressMap<Server> serverAddressToServerMap = new ServerAddressMap<>();
   private final Map<Server, ServerAddressRequestHandlerRegistry> requestHandlerPerServerAddress = new HashMap<>();
+
+  public HttpListenerRegistry(Charset defaultEncoding, MessageProcessingManager messageProcessingManager)
+  {
+    HttpResponseFactory httpResponseFactory = new HttpResponseFactory(HttpStreamingType.NEVER, new ObjectToByteArray());
+    this.noListenerRequestHandler = new NoListenerRequestHandler(defaultEncoding, messageProcessingManager, httpResponseFactory);
+    this.noMethodRequestHandler = new NoMethodRequestHandler(defaultEncoding, messageProcessingManager, httpResponseFactory);
+    this.serviceTemporarlyUnavailableRequestHandler = new ServiceTemporarilyUnavailableListenerRequestHandler(defaultEncoding, messageProcessingManager, httpResponseFactory);
+  }
 
   public synchronized RequestHandlerManager addRequestHandler(final Server server, final RequestHandler requestHandler,
                                                               final ListenerRequestMatcher requestMatcher) {
@@ -66,7 +82,7 @@ public class HttpListenerRegistry implements RequestHandlerProvider {
     if (logger.isDebugEnabled()) {
       logger.debug("No RequestHandler found for request: " + request.getPath());
     }
-    return NoListenerRequestHandler.getInstance();
+    return noListenerRequestHandler;
   }
 
   public class ServerAddressRequestHandlerRegistry {
@@ -194,12 +210,12 @@ public class HttpListenerRegistry implements RequestHandlerProvider {
           logger.info("Available listeners are: [{}]", Joiner.on(", ").join(this.paths));
         }
         if (methodNotAllowed) {
-          return NoMethodRequestHandler.getInstance();
+          return noMethodRequestHandler;
         }
-        return NoListenerRequestHandler.getInstance();
+        return noListenerRequestHandler;
       }
       if (!requestHandlerMatcherPair.isRunning()) {
-        return ServiceTemporarilyUnavailableListenerRequestHandler.getInstance();
+        return serviceTemporarlyUnavailableRequestHandler;
       }
       return requestHandlerMatcherPair.getRequestHandler();
     }

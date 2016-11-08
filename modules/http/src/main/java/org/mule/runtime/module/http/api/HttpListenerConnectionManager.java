@@ -7,6 +7,7 @@
 package org.mule.runtime.module.http.api;
 
 
+import static org.mule.runtime.core.util.SystemUtils.getDefaultEncoding;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.core.api.context.MuleContextAware;
@@ -15,6 +16,8 @@ import org.mule.runtime.core.api.lifecycle.Disposable;
 import org.mule.runtime.core.api.lifecycle.Initialisable;
 import org.mule.runtime.core.api.lifecycle.InitialisationException;
 import org.mule.runtime.core.config.i18n.CoreMessages;
+import org.mule.runtime.core.execution.MessageProcessingManager;
+import org.mule.runtime.core.policy.PolicyManager;
 import org.mule.runtime.module.http.internal.listener.HttpListenerRegistry;
 import org.mule.runtime.module.http.internal.listener.HttpServerManager;
 import org.mule.runtime.module.http.internal.listener.Server;
@@ -30,6 +33,8 @@ import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.Collection;
 
+import javax.inject.Inject;
+
 public class HttpListenerConnectionManager implements Initialisable, Disposable, MuleContextAware {
 
   public static final String HTTP_LISTENER_CONNECTION_MANAGER = "_httpListenerConnectionManager";
@@ -37,13 +42,19 @@ public class HttpListenerConnectionManager implements Initialisable, Disposable,
       "A server in port(%s) already exists for ip(%s) or one overlapping it (0.0.0.0).";
   private static final String LISTENER_THREAD_NAME_PREFIX = "http.listener";
 
-  private HttpListenerRegistry httpListenerRegistry = new HttpListenerRegistry();
+  private HttpListenerRegistry httpListenerRegistry;
   private HttpServerManager httpServerManager;
 
   private MuleContext muleContext;
 
+  @Inject
+  private PolicyManager policyManager;
+  @Inject
+  private MessageProcessingManager messageProcessingManager;
+
   @Override
   public void initialise() throws InitialisationException {
+    httpListenerRegistry = new HttpListenerRegistry(getDefaultEncoding(muleContext), messageProcessingManager);
     Collection<TcpServerSocketProperties> tcpServerSocketPropertiesBeans =
         muleContext.getRegistry().lookupObjects(TcpServerSocketProperties.class);
     TcpServerSocketProperties tcpServerSocketProperties = new DefaultTcpServerSocketProperties();
@@ -57,7 +68,7 @@ public class HttpListenerConnectionManager implements Initialisable, Disposable,
 
     String threadNamePrefix = ThreadNameHelper.getPrefix(muleContext) + LISTENER_THREAD_NAME_PREFIX;
     try {
-      httpServerManager = new GrizzlyServerManager(threadNamePrefix, httpListenerRegistry, tcpServerSocketProperties);
+      httpServerManager = new GrizzlyServerManager(threadNamePrefix, httpListenerRegistry, tcpServerSocketProperties, policyManager);
     } catch (IOException e) {
       throw new InitialisationException(e, this);
     }

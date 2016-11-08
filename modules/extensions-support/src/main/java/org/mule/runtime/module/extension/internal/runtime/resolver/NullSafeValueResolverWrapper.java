@@ -147,4 +147,16 @@ public class NullSafeValueResolverWrapper<T> implements ValueResolver<T> {
   public boolean isDynamic() {
     return delegate.isDynamic();
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }

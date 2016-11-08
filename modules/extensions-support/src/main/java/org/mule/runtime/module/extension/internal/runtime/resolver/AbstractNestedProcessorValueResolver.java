@@ -49,4 +49,16 @@ abstract class AbstractNestedProcessorValueResolver<T> implements ValueResolver<
   public boolean isDynamic() {
     return false;
   }
+
+  @Override
+  public void accept(ResolverSetVisitor resolverSetVisitor)
+  {
+
+  }
+
+  @Override
+  public void resolve(ShittyParameterResolver parameterResolver)
+  {
+
+  }
 }
