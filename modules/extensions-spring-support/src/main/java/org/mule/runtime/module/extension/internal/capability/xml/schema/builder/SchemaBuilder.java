@@ -506,7 +506,7 @@ public final class SchemaBuilder {
   }
 
   private MetadataTypeVisitor getParameterDeclarationVisitor(final ExtensionType extensionType, final ExplicitGroup all,
-                                                     final ParameterModel parameterModel) {
+                                                             final ParameterModel parameterModel) {
     final DslElementSyntax paramDsl = dslResolver.resolve(parameterModel);
     return getParameterDeclarationVisitor(extensionType, all, parameterModel.getName(), parameterModel.getDescription(),
                                           parameterModel.getExpressionSupport(), parameterModel.isRequired(),
