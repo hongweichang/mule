@@ -55,9 +55,9 @@ public class ContentParameterModelEnricher implements ModelEnricher {
 
       if (p.getPurpose() == PRIMARY_CONTENT) {
         defaultToPayload(p);
+        p.setRequired(false);
       }
     });
-
   }
 
   private void configureDsl(ParameterDeclaration p) {
