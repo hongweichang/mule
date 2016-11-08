@@ -31,7 +31,7 @@ import reactor.core.publisher.Flux;
  * This factory's processing strategy uses the 'asynchronous' strategy where possible, but if an event is synchronous it processes
  * it synchronously rather than failing.
  */
-public class DefaultFlowProcessingStrategyFactory extends AsynchronousProcessingStrategyFactory {
+public class DefaultFlowProcessingStrategyFactory extends LegacyAsynchronousProcessingStrategyFactory {
 
   @Override
   public ProcessingStrategy create(MuleContext muleContext) {
@@ -44,7 +44,7 @@ public class DefaultFlowProcessingStrategyFactory extends AsynchronousProcessing
     }, scheduler -> scheduler.stop(muleContext.getConfiguration().getShutdownTimeout(), MILLISECONDS), muleContext);
   }
 
-  static class DefaultFlowProcessingStrategy extends AsynchronousProcessingStrategy {
+  static class DefaultFlowProcessingStrategy extends LegacyAsynchronousProcessingStrategy {
 
     public DefaultFlowProcessingStrategy(Supplier<Scheduler> schedulerSupplier, Consumer<Scheduler> schedulerStopper,
                                          MuleContext muleContext) {
@@ -58,8 +58,7 @@ public class DefaultFlowProcessingStrategyFactory extends AsynchronousProcessing
         Flux<Event> flux = just(request);
 
         if (canProcessAsync(request)) {
-          flux = flux.doOnNext(event -> fireAsyncScheduledNotification(event, pipeline))
-              .publishOn(fromExecutorService(getScheduler()));
+          flux = flux.doOnNext(fireAsyncScheduledNotification(pipeline)).publishOn(fromExecutorService(getScheduler()));
         }
 
         flux = flux.transform(publisherFunction);

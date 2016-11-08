@@ -33,7 +33,7 @@ import org.reactivestreams.Publisher;
  *
  * @since 3.7
  */
-public class NonBlockingProcessingStrategyFactory extends AsynchronousProcessingStrategyFactory {
+public class LegacyNonBlockingProcessingStrategyFactory extends LegacyAsynchronousProcessingStrategyFactory {
 
   @Override
   public ProcessingStrategy create(MuleContext muleContext) {

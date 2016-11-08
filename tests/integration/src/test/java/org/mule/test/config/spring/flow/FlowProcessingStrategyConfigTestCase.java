@@ -13,9 +13,9 @@ import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 import org.mule.runtime.core.construct.Flow;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyAsynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.DefaultFlowProcessingStrategyFactory;
-import org.mule.runtime.core.processor.strategy.NonBlockingProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyNonBlockingProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory;
 import org.mule.test.AbstractIntegrationTestCase;
 
@@ -40,12 +40,13 @@ public class FlowProcessingStrategyConfigTestCase extends AbstractIntegrationTes
 
   @Test
   public void testAsynchronous() throws Exception {
-    assertThat(getFlowProcessingStrategyFactory("asynchronousFlow"), instanceOf(AsynchronousProcessingStrategyFactory.class));
+    assertThat(getFlowProcessingStrategyFactory("asynchronousFlow"),
+               instanceOf(LegacyAsynchronousProcessingStrategyFactory.class));
   }
 
   @Test
   public void testNonBlocking() throws Exception {
-    assertThat(getFlowProcessingStrategyFactory("nonBlockingFlow"), instanceOf(NonBlockingProcessingStrategyFactory.class));
+    assertThat(getFlowProcessingStrategyFactory("nonBlockingFlow"), instanceOf(LegacyNonBlockingProcessingStrategyFactory.class));
   }
 
   @Test
@@ -58,12 +59,13 @@ public class FlowProcessingStrategyConfigTestCase extends AbstractIntegrationTes
 
   @Test
   public void testDefaultAsync() throws Exception {
-    assertThat(getFlowProcessingStrategyFactory("defaultAsync"), instanceOf(AsynchronousProcessingStrategyFactory.class));
+    assertThat(getFlowProcessingStrategyFactory("defaultAsync"), instanceOf(LegacyAsynchronousProcessingStrategyFactory.class));
   }
 
   @Test
   public void testAsynchronousAsync() throws Exception {
-    assertThat(getFlowProcessingStrategyFactory("asynchronousAsync"), instanceOf(AsynchronousProcessingStrategyFactory.class));
+    assertThat(getFlowProcessingStrategyFactory("asynchronousAsync"),
+               instanceOf(LegacyAsynchronousProcessingStrategyFactory.class));
   }
 
   private ProcessingStrategyFactory getFlowProcessingStrategyFactory(String flowName) throws Exception {

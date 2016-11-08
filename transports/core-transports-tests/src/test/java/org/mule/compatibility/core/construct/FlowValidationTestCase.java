@@ -22,7 +22,7 @@ import org.mule.runtime.core.construct.Flow;
 import org.mule.runtime.core.exception.OnErrorPropagateHandler;
 import org.mule.runtime.core.processor.AbstractRedeliveryPolicy;
 import org.mule.runtime.core.processor.IdempotentRedeliveryPolicy;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyAsynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
@@ -60,7 +60,7 @@ public class FlowValidationTestCase extends AbstractMuleTestCase {
   @Test
   public void testProcessingStrategyCantBeAsyncWithRedelivery() throws Exception {
     configureFlowForRedelivery();
-    flow.setProcessingStrategyFactory(new AsynchronousProcessingStrategyFactory());
+    flow.setProcessingStrategyFactory(new LegacyAsynchronousProcessingStrategyFactory());
 
     expected.expectCause(hasCause(instanceOf(FlowConstructInvalidException.class)));
     expected.expectMessage("One of the message sources configured on this Flow is not "

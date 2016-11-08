@@ -7,13 +7,16 @@
 package org.mule.runtime.core.processor.strategy;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.core.context.notification.AsyncMessageNotification.PROCESS_ASYNC_COMPLETE;
 import static org.mule.runtime.core.context.notification.AsyncMessageNotification.PROCESS_ASYNC_SCHEDULED;
+import static reactor.core.Exceptions.propagate;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.core.api.DefaultMuleException;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.construct.Pipeline;
@@ -27,6 +30,7 @@ import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.core.context.notification.AsyncMessageNotification;
 import org.mule.runtime.core.exception.MessagingException;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -41,6 +45,8 @@ import org.reactivestreams.Publisher;
  */
 public class AsynchronousProcessingStrategyFactory implements ProcessingStrategyFactory {
 
+  public static final String TRANSACTIONAL_ERROR_MESSAGE = "Unable to process a transactional flow asynchronously";
+
   @Override
   public ProcessingStrategy create(MuleContext muleContext) {
     return new AsynchronousProcessingStrategy(() -> {
@@ -53,8 +59,6 @@ public class AsynchronousProcessingStrategyFactory implements ProcessingStrategy
   }
 
   static class AsynchronousProcessingStrategy implements ProcessingStrategy, Startable, Stoppable {
-
-    protected ProcessingStrategy synchronousProcessingStrategy;
 
     private Supplier<Scheduler> schedulerSupplier;
     private Consumer<Scheduler> schedulerStopper;
@@ -73,23 +77,6 @@ public class AsynchronousProcessingStrategyFactory implements ProcessingStrategy
       this.scheduler = schedulerSupplier.get();
     }
 
-    public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
-                                                                   Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
-
-      // Conserve existing 3.x async processing strategy behaviuor:
-      // i) The request event is echoed rather than the the result of async processing returned
-      // ii) Any exceptions that occur due to async processing are not propagated upwards
-      return publisher -> from(publisher).concatMap(request -> just(request)
-          .doOnNext(event -> fireAsyncScheduledNotification(event, pipeline))
-          .publishOn(fromExecutorService(scheduler))
-          .transform(publisherFunction)
-          .map(response -> request)
-          .doOnNext(event -> fireAsyncCompleteNotification(event, pipeline, null))
-          .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(request, pipeline, e))
-          .onErrorResumeWith(MessagingException.class, pipeline.getExceptionListener())
-          .onErrorReturn(MessagingException.class, request));
-    }
-
     @Override
     public void stop() throws MuleException {
       if (scheduler != null) {
@@ -97,13 +84,33 @@ public class AsynchronousProcessingStrategyFactory implements ProcessingStrategy
       }
     }
 
-    protected void fireAsyncScheduledNotification(Event event, Pipeline pipeline) {
-      muleContext.getNotificationManager()
+    public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
+                                                                   Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
+
+      return publisher -> from(publisher)
+          .doOnNext(assertCanProcessAsync())
+          .doOnNext(fireAsyncScheduledNotification(pipeline))
+          .publishOn(fromExecutorService(scheduler))
+          .transform(publisherFunction)
+          .doOnNext(request -> fireAsyncCompleteNotification(request, pipeline, null))
+          .doOnError(MessagingException.class,
+                     msgException -> fireAsyncCompleteNotification(msgException.getEvent(), pipeline, msgException));
+    }
+
+    private Consumer<Event> assertCanProcessAsync() {
+      return event -> {
+        if (event.isTransacted()) {
+          throw propagate(new DefaultMuleException(createStaticMessage(TRANSACTIONAL_ERROR_MESSAGE)));
+        }
+      };
+    }
+
+    protected Consumer<Event> fireAsyncScheduledNotification(Pipeline pipeline) {
+      return event -> muleContext.getNotificationManager()
           .fireNotification(new AsyncMessageNotification(pipeline, event, null, PROCESS_ASYNC_SCHEDULED));
     }
 
     protected void fireAsyncCompleteNotification(Event event, Pipeline pipeline, MessagingException exception) {
-      // Async completed notification uses same event instance as async listener
       muleContext.getNotificationManager()
           .fireNotification(new AsyncMessageNotification(pipeline, event, null, PROCESS_ASYNC_COMPLETE, exception));
     }

@@ -30,7 +30,6 @@ public class DefaultFlowCallStack implements FlowCallStack {
    * @param flowStackElement the element to add
    */
   public void push(FlowStackElement flowStackElement) {
-    System.out.println("FLOW STACK REGISTED of " + System.identityHashCode(this));
     innerStack.push(flowStackElement);
   }
 
@@ -52,7 +51,6 @@ public class DefaultFlowCallStack implements FlowCallStack {
    * @throws EmptyStackException if this stack is empty.
    */
   public FlowStackElement pop() {
-    System.out.println("FLOW STACK POP of " + System.identityHashCode(this));
     return innerStack.pop();
   }
 

@@ -17,11 +17,9 @@ import static org.mule.runtime.core.context.notification.PipelineMessageNotifica
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_START;
 import static org.mule.runtime.core.util.NotificationUtils.buildPathResolver;
 import static org.mule.runtime.core.util.rx.Exceptions.rxExceptionToMuleException;
-import static reactor.core.Exceptions.unwrap;
 import static reactor.core.publisher.Flux.from;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
-import org.mule.runtime.core.api.DefaultMuleException;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.GlobalNameableObject;
 import org.mule.runtime.core.api.MuleContext;
@@ -56,14 +54,13 @@ import org.mule.runtime.core.processor.AbstractInterceptingMessageProcessor;
 import org.mule.runtime.core.processor.AbstractRequestResponseMessageProcessor;
 import org.mule.runtime.core.processor.IdempotentRedeliveryPolicy;
 import org.mule.runtime.core.processor.chain.DefaultMessageProcessorChainBuilder;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyAsynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.DefaultFlowProcessingStrategyFactory;
-import org.mule.runtime.core.processor.strategy.NonBlockingProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyNonBlockingProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.source.ClusterizableMessageSourceWrapper;
 import org.mule.runtime.core.util.NotificationUtils;
 import org.mule.runtime.core.util.NotificationUtils.PathResolver;
-import org.mule.runtime.core.util.rx.Exceptions;
 
 import java.util.Collections;
 import java.util.List;
@@ -286,7 +283,7 @@ public abstract class AbstractPipeline extends AbstractFlowConstruct implements 
     // Ensure that inbound endpoints are compatible with processing strategy.
     boolean userConfiguredProcessingStrategy = !(getProcessingStrategyFactory() instanceof DefaultFlowProcessingStrategyFactory);
     boolean userConfiguredAsyncProcessingStrategy =
-        getProcessingStrategyFactory() instanceof AsynchronousProcessingStrategyFactory && userConfiguredProcessingStrategy;
+        getProcessingStrategyFactory() instanceof LegacyAsynchronousProcessingStrategyFactory && userConfiguredProcessingStrategy;
 
     boolean isCompatibleWithAsync = sourceCompatibleWithAsync.evaluate(messageSource);
     if (userConfiguredAsyncProcessingStrategy
@@ -297,7 +294,7 @@ public abstract class AbstractPipeline extends AbstractFlowConstruct implements 
               + "because it is request-response, has a transaction defined, or " + "messaging redelivered is configured."), this);
     }
 
-    if (getProcessingStrategyFactory() instanceof NonBlockingProcessingStrategyFactory && messageSource != null
+    if (getProcessingStrategyFactory() instanceof LegacyNonBlockingProcessingStrategyFactory && messageSource != null
         && !(messageSource instanceof NonBlockingMessageSource)) {
       throw new FlowConstructInvalidException(CoreMessages
           .createStaticMessage(format("The non-blocking processing strategy (%s) currently only supports non-blocking messages sources (source is %s).",
@@ -444,7 +441,7 @@ public abstract class AbstractPipeline extends AbstractFlowConstruct implements 
       try {
         return Mono.just(event).transform(this).block();
       } catch (Throwable e) {
-        throw rxExceptionToMuleException(e, false);
+        throw rxExceptionToMuleException(e);
       }
     }
 

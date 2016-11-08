@@ -121,7 +121,7 @@ public abstract class AbstractMessageProcessorChain extends AbstractAnnotatedObj
         .doOnNext(preNotification(processor))
         .doOnNext(event -> setCurrentEvent(event))
         .transform(stream -> from(stream.transform(processor)))
-        // If there is a messaging exception, reacreate it to add reference to processor that failed.
+        // If there is a messaging exception set the processor that failed.
         .mapError(MessagingException.class,
                   exception -> {
                     exception.setProcessedEvent(createErrorEvent(exception.getEvent(), processor, exception, muleContext));
@@ -129,7 +129,6 @@ public abstract class AbstractMessageProcessorChain extends AbstractAnnotatedObj
                   })
         .doOnNext(result -> setCurrentEvent(result))
         .doOnNext(postNotification(processor))
-        .doOnError(e -> System.out.println("ERROR THROW BY PROCESSOR" + processor.getClass().getName()))
         .doOnError(MessagingException.class, errorNotification(processor));
   }
 

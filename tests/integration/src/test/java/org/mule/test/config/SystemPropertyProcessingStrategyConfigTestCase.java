@@ -15,7 +15,7 @@ import static org.mule.runtime.core.api.config.MuleProperties.MULE_DEFAULT_PROCE
 import static org.mule.runtime.core.util.ProcessingStrategyUtils.NON_BLOCKING_PROCESSING_STRATEGY;
 import static org.mule.runtime.core.util.ProcessingStrategyUtils.SYNC_PROCESSING_STRATEGY;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
-import org.mule.runtime.core.processor.strategy.NonBlockingProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyNonBlockingProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory;
 import org.mule.tck.junit4.rule.SystemProperty;
 import org.mule.test.AbstractIntegrationTestCase;
@@ -35,7 +35,7 @@ public class SystemPropertyProcessingStrategyConfigTestCase extends AbstractInte
     return asList(new Object[][] {
         {"Container level system property", new String[] {}, SynchronousProcessingStrategyFactory.class},
         {"Configuration overrides system property", new String[] {"configuration-processing-strategy-config.xml"},
-            NonBlockingProcessingStrategyFactory.class}
+            LegacyNonBlockingProcessingStrategyFactory.class}
     });
   }
 

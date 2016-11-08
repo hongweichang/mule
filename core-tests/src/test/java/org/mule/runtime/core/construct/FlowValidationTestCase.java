@@ -15,8 +15,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.internal.matchers.ThrowableCauseMatcher.hasCause;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory
-    .SYNCHRONOUS_PROCESSING_STRATEGY_INSTANCE;
+import static org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory.SYNCHRONOUS_PROCESSING_STRATEGY_INSTANCE;
 import static org.mule.tck.util.MuleContextUtils.mockContextWithServices;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.api.MuleContext;
@@ -26,7 +25,7 @@ import org.mule.runtime.core.api.source.NonBlockingMessageSource;
 import org.mule.runtime.core.exception.OnErrorPropagateHandler;
 import org.mule.runtime.core.processor.AbstractRedeliveryPolicy;
 import org.mule.runtime.core.processor.IdempotentRedeliveryPolicy;
-import org.mule.runtime.core.processor.strategy.NonBlockingProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyNonBlockingProcessingStrategyFactory;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import org.junit.Before;
@@ -60,7 +59,7 @@ public class FlowValidationTestCase extends AbstractMuleTestCase {
 
   @Test
   public void testProcessingStrategyNonBlockingSupported() throws Exception {
-    flow.setProcessingStrategyFactory(new NonBlockingProcessingStrategyFactory());
+    flow.setProcessingStrategyFactory(new LegacyNonBlockingProcessingStrategyFactory());
     flow.setMessageSource((NonBlockingMessageSource) listener -> {
     });
     flow.initialise();
@@ -68,7 +67,7 @@ public class FlowValidationTestCase extends AbstractMuleTestCase {
 
   @Test
   public void testProcessingStrategyNonBlockingNotSupported() throws Exception {
-    flow.setProcessingStrategyFactory(new NonBlockingProcessingStrategyFactory());
+    flow.setProcessingStrategyFactory(new LegacyNonBlockingProcessingStrategyFactory());
     flow.setMessageSource(listener -> {
     });
 

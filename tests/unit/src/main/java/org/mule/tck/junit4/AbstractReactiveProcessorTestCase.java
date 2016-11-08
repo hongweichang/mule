@@ -7,11 +7,15 @@
 package org.mule.tck.junit4;
 
 import static java.util.Arrays.asList;
+import static org.mule.runtime.core.util.rx.Exceptions.rxExceptionToMuleException;
 import static org.mule.tck.MuleTestUtils.processAsStreamAndBlock;
+import static reactor.core.Exceptions.unwrap;
+import static reactor.core.publisher.Mono.just;
 
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.processor.Processor;
 import org.mule.runtime.core.api.scheduler.Scheduler;
+import org.mule.runtime.core.construct.Flow;
 import org.mule.runtime.core.exception.MessagingException;
 import org.mule.tck.SimpleUnitTestSupportSchedulerService;
 
@@ -20,6 +24,7 @@ import java.util.Collection;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.reactivestreams.Publisher;
+import reactor.core.Exceptions;
 
 /**
  * Abstract base test case extending {@link AbstractMuleContextTestCase} to be used when a {@link Processor} or
@@ -62,7 +67,7 @@ public abstract class AbstractReactiveProcessorTestCase extends AbstractMuleCont
       try {
         return processAsStreamAndBlock(event, processor);
       } catch (MessagingException msgException) {
-        // unwrap MessageingException to ensure same exception is thrown by blocking and non-blocking processing
+        // unwrap MessagingException to ensure same exception is thrown by blocking and non-blocking processing
         throw msgException.getCause() != null ? (Exception) msgException.getCause() : msgException;
       }
     } else {
@@ -70,7 +75,25 @@ public abstract class AbstractReactiveProcessorTestCase extends AbstractMuleCont
     }
   }
 
+  /*
+   * Do not unwrap MessagingException thrown by use of apply() for compatability with flow.process()
+   */
+  protected Event processFlow(Flow flow, Event event) throws Exception {
+    if (reactive) {
+      try {
+        return just(event)
+            .transform(flow)
+            .subscribe()
+            .blockMillis(RECEIVE_TIMEOUT);
+      } catch (Throwable exception) {
+        throw (Exception) unwrap(exception);
+      }
+    } else {
+      return flow.process(event);
+    }
+  }
+
   protected boolean isReactive() {
-    return this.reactive;
+    return reactive;
   }
 }

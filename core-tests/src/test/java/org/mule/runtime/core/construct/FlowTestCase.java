@@ -38,7 +38,7 @@ import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.core.api.source.MessageSource;
 import org.mule.runtime.core.processor.ResponseMessageProcessorAdapter;
 import org.mule.runtime.core.processor.chain.DynamicMessageProcessorContainer;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory;
+import org.mule.runtime.core.processor.strategy.LegacyAsynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.processor.strategy.SynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.transformer.simple.StringAppendTransformer;
 import org.mule.runtime.core.util.NotificationUtils.FlowMap;
@@ -207,7 +207,7 @@ public class FlowTestCase extends AbstractFlowConstructTestCase {
 
   @Test
   public void restartWithAsynchronousProcessingStrategy() throws Exception {
-    flow.setProcessingStrategyFactory(new AsynchronousProcessingStrategyFactory());
+    flow.setProcessingStrategyFactory(new LegacyAsynchronousProcessingStrategyFactory());
     flow.initialise();
     flow.start();
 

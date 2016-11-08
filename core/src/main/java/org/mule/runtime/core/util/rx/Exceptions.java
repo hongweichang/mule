@@ -216,12 +216,19 @@ public class Exceptions {
     boolean testChecked(T t, U u) throws Throwable;
   }
 
-  public static MuleException rxExceptionToMuleException(Throwable throwable, boolean unwrapMessagingException) {
+  public static MuleException rxExceptionToMuleException(Throwable throwable)
+      throws MuleException {
     Throwable unwrapped = unwrap(throwable);
-    if (unwrapMessagingException && unwrapped instanceof MessagingException) {
-      unwrapped = unwrapped.getCause();
+    if (unwrapped instanceof MessagingException) {
+      unwrapped = unwrapped.getCause() != null ? unwrapped.getCause() : unwrapped;
     }
-    return unwrapped instanceof MuleException ? (MuleException) unwrapped : new DefaultMuleException(throwable);
+    if (unwrapped instanceof MuleException) {
+      return (MuleException) unwrapped;
+    } else if (unwrapped instanceof RuntimeException) {
+      throw (RuntimeException) unwrapped;
+    } else {
+      throw new DefaultMuleException(throwable);
+    }
   }
 
 }

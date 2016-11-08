@@ -245,12 +245,14 @@ public class DefaultMuleContext implements MuleContext {
 
   static {
     // Ensure reactor operatorError hook is always registered.
-    Hooks.onOperatorError((throwable, o) -> {
-      Throwable unwrapped = unwrap(throwable);
-      if (!(unwrapped instanceof MessagingException)) {
-        return new MessagingException((Event) o, unwrapped);
+    Hooks.onOperatorError((throwable, signal) -> {
+      // Only apply hook for Event signals.
+      if (signal instanceof Event) {
+        // Rewrap messaging exception so wrapped messaging exception is conserved when messaging exception is unwrapped to
+        // conserve existing behaviour.
+        return new MessagingException((Event) signal, unwrap(throwable));
       } else {
-        return unwrapped;
+        return throwable;
       }
     });
   }

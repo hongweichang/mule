@@ -7,7 +7,6 @@
 package org.mule.runtime.core.construct.processor;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.argThat;
@@ -23,10 +22,11 @@ import static org.mule.runtime.core.context.notification.AsyncMessageNotificatio
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_COMPLETE;
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_END;
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_START;
+import static org.mule.runtime.core.util.rx.Exceptions.rxExceptionToMuleException;
 import static org.mule.tck.MuleTestUtils.processAsStreamAndBlock;
 import static org.mule.tck.util.MuleContextUtils.mockContextWithServices;
-import static reactor.core.publisher.Flux.from;
-
+import static reactor.core.Exceptions.unwrap;
+import static reactor.core.publisher.Mono.just;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.DefaultEventContext;
 import org.mule.runtime.core.TransformationService;
@@ -37,10 +37,8 @@ import org.mule.runtime.core.api.context.notification.ServerNotification;
 import org.mule.runtime.core.api.message.InternalMessage;
 import org.mule.runtime.core.api.processor.MessageProcessorChainBuilder;
 import org.mule.runtime.core.api.processor.Processor;
-import org.mule.runtime.core.api.registry.RegistrationException;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.runtime.core.config.DefaultMuleConfiguration;
-import org.mule.runtime.core.construct.AbstractPipeline;
 import org.mule.runtime.core.construct.Flow;
 import org.mule.runtime.core.context.notification.AsyncMessageNotification;
 import org.mule.runtime.core.context.notification.ExceptionStrategyNotification;
@@ -49,8 +47,6 @@ import org.mule.runtime.core.context.notification.ServerNotificationManager;
 import org.mule.runtime.core.exception.DefaultMessagingExceptionStrategy;
 import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.core.management.stats.AllStatistics;
-import org.mule.runtime.core.processor.ResponseMessageProcessorAdapter;
-import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFactory;
 import org.mule.tck.junit4.AbstractReactiveProcessorTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
@@ -67,7 +63,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentMatcher;
-import org.reactivestreams.Publisher;
+import reactor.core.Exceptions;
 
 @RunWith(Parameterized.class)
 public class PipelineMessageNotificationTestCase extends AbstractReactiveProcessorTestCase {
@@ -92,6 +88,7 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
     muleContext = mockContextWithServices();
     when(muleContext.getStatistics()).thenReturn(new AllStatistics());
     when(muleContext.getConfiguration()).thenReturn(new DefaultMuleConfiguration());
+    when(muleContext.getDefaultErrorHandler()).thenReturn(new DefaultMessagingExceptionStrategy(muleContext));
     notificationManager = mock(ServerNotificationManager.class);
     when(muleContext.getNotificationManager()).thenReturn(notificationManager);
     pipeline = new TestPipeline(pipelineName, muleContext);
@@ -100,18 +97,19 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
   }
 
   @After
-  public void after() throws RegistrationException, MuleException {
+  public void after() throws MuleException {
     stopIfNeeded(muleContext.getRegistry().lookupObject(SchedulerService.class));
   }
 
   @Test
   public void requestResponse() throws Exception {
     pipeline.initialise();
+    pipeline.start();
 
     event = Event.builder(context).message(InternalMessage.builder().payload("request").build()).exchangePattern(REQUEST_RESPONSE)
         .flow(pipeline).build();
 
-    process(pipeline, event);
+    processFlow(pipeline, event);
 
     verify(notificationManager, times(1))
         .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_START, false, event)));
@@ -125,11 +123,12 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
   @Test
   public void oneWay() throws Exception {
     pipeline.initialise();
+    pipeline.start();
 
     event = Event.builder(context).message(InternalMessage.builder().payload("request").build()).exchangePattern(ONE_WAY)
         .flow(pipeline).build();
 
-    process(pipeline, event);
+    processFlow(pipeline, event);
 
     new PollingProber(RECEIVE_TIMEOUT, 50).check(new JUnitLambdaProbe(() -> {
       verify(notificationManager, times(1))
@@ -138,18 +137,24 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
           .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_END, false, event)));
       verify(notificationManager, times(1))
           .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_COMPLETE, false, event)));
-      verify(notificationManager, times(3)).fireNotification(any(PipelineMessageNotification.class));
+      verify(notificationManager, times(5)).fireNotification(any(PipelineMessageNotification.class));
+      verify(notificationManager, times(1))
+          .fireNotification(
+                            argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_ASYNC_SCHEDULED, false, event)));
+      verify(notificationManager, times(1))
+          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_ASYNC_COMPLETE, false, null)));
       return true;
     }));
   }
 
   @Test
-  public void requestResponseRequestException() throws Exception {
+  public void requestResponseException() throws Exception {
     pipeline.setExceptionListener(new DefaultMessagingExceptionStrategy());
     List<Processor> processors = new ArrayList<>();
     processors.add(new ExceptionThrowingMessageProcessor());
     pipeline.setMessageProcessors(processors);
     pipeline.initialise();
+    pipeline.start();
 
     event = Event.builder(context).message(InternalMessage.builder().payload("request").build()).exchangePattern(REQUEST_RESPONSE)
         .flow(pipeline).build();
@@ -157,75 +162,28 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
     thrown.expect(instanceOf(MessagingException.class));
     thrown.expectCause(instanceOf(IllegalStateException.class));
     try {
-      process(pipeline, event);
+      processFlow(pipeline, event);
     } finally {
       verify(notificationManager, times(1))
           .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_START, false, event)));
       verify(notificationManager, times(1))
           .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_COMPLETE, true, event)));
-      verify(notificationManager, times(2)).fireNotification(any(PipelineMessageNotification.class));
+      verify(notificationManager, times(1))
+          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(ExceptionStrategyNotification.PROCESS_START,
+                                                                                    false, null)));
+      verify(notificationManager, times(1))
+          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(ExceptionStrategyNotification.PROCESS_END,
+                                                                                    false, null)));
+      verify(notificationManager, times(4)).fireNotification(any(PipelineMessageNotification.class));
     }
   }
 
   @Test
-  public void requestResponseResponseException() throws Exception {
-    pipeline.setExceptionListener(new DefaultMessagingExceptionStrategy());
-    List<Processor> processors = new ArrayList<>();
-    processors.add(new ResponseMessageProcessorAdapter(new ExceptionThrowingMessageProcessor()));
-    pipeline.setMessageProcessors(processors);
-    pipeline.initialise();
-
-    event = Event.builder(context).message(InternalMessage.builder().payload("request").build()).exchangePattern(REQUEST_RESPONSE)
-        .flow(pipeline).build();
-
-    thrown.expect(instanceOf(MessagingException.class));
-    thrown.expectCause(instanceOf(IllegalStateException.class));
-    try {
-      process(pipeline, event);
-    } finally {
-      verify(notificationManager, times(1))
-          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_START, false, event)));
-      verify(notificationManager, times(1))
-          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_END, false, event)));
-      verify(notificationManager, times(1))
-          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_COMPLETE, true, event)));
-      verify(notificationManager, times(3)).fireNotification(any(PipelineMessageNotification.class));
-    }
-  }
-
-  @Test
-  public void oneWayRequestException() throws Exception {
-    pipeline.setExceptionListener(new DefaultMessagingExceptionStrategy());
-    List<Processor> processors = new ArrayList<>();
-    processors.add(new ExceptionThrowingMessageProcessor());
-    pipeline.setMessageProcessors(processors);
-    pipeline.initialise();
-
-    event = Event.builder(context).message(InternalMessage.builder().payload("request").build()).exchangePattern(ONE_WAY)
-        .flow(pipeline).build();
-
-    thrown.expect(instanceOf(MessagingException.class));
-    thrown.expectCause(is(instanceOf(IllegalStateException.class)));
-    try {
-      process(pipeline, event);
-    } finally {
-      verify(notificationManager, times(1))
-          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_START, false, event)));
-      verify(notificationManager, times(1))
-          .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_COMPLETE, true, null)));
-      verify(notificationManager, times(2)).fireNotification(any(PipelineMessageNotification.class));
-    }
-  }
-
-  @Test
-  public void oneWayAsyncRequestException() throws Exception {
+  public void oneWayException() throws Exception {
     Flow pipeline = new Flow("test", muleContext);
-    pipeline.setProcessingStrategyFactory(new AsynchronousProcessingStrategyFactory());
     pipeline.setExceptionListener(new DefaultMessagingExceptionStrategy());
     List<Processor> processors = new ArrayList<>();
-    processors.add(event -> {
-      throw new RuntimeException("error");
-    });
+    processors.add(new ExceptionThrowingMessageProcessor());
     pipeline.setMessageProcessors(processors);
     pipeline.initialise();
     pipeline.start();
@@ -234,22 +192,25 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
         .flow(pipeline).build();
 
     try {
-      process(pipeline, event);
+      processFlow(pipeline, event);
     } finally {
-      new PollingProber(2000, 50).check(new JUnitLambdaProbe(() -> {
+      new PollingProber(RECEIVE_TIMEOUT, 50).check(new JUnitLambdaProbe(() -> {
         verify(notificationManager, times(1))
             .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_START, false, event)));
         verify(notificationManager, times(1))
             .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_COMPLETE, false, null)));
         verify(notificationManager, times(1))
+            .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(ExceptionStrategyNotification.PROCESS_START,
+                                                                                      false, null)));
+        verify(notificationManager, times(1))
             .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(ExceptionStrategyNotification.PROCESS_END,
                                                                                       false, null)));
-        verify(notificationManager, times(6)).fireNotification(any(PipelineMessageNotification.class));
         verify(notificationManager, times(1))
             .fireNotification(
                               argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_ASYNC_SCHEDULED, false, event)));
         verify(notificationManager, times(1))
             .fireNotification(argThat(new PipelineMessageNotificiationArgumentMatcher(PROCESS_ASYNC_COMPLETE, true, null)));
+        verify(notificationManager, times(6)).fireNotification(any(PipelineMessageNotification.class));
         return true;
       }));
     }
@@ -257,8 +218,7 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
     pipeline.dispose();
   }
 
-
-  private class TestPipeline extends AbstractPipeline implements Processor {
+  private class TestPipeline extends Flow {
 
     CountDownLatch latch = new CountDownLatch(2);
 
@@ -289,15 +249,6 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
       return "test";
     }
 
-    @Override
-    public Event process(Event event) throws MuleException {
-      return pipeline.process(event);
-    }
-
-    @Override
-    public Publisher<Event> apply(Publisher<Event> publisher) {
-      return from(publisher).transform(pipeline);
-    }
   }
 
   private class PipelineMessageNotificiationArgumentMatcher extends ArgumentMatcher<PipelineMessageNotification> {
@@ -337,18 +288,6 @@ public class PipelineMessageNotificationTestCase extends AbstractReactiveProcess
     @Override
     public Event process(Event event) throws MuleException {
       throw new IllegalStateException();
-    }
-  }
-
-  /*
-   * Override to not unwrap MessagingExceptions
-   */
-  @Override
-  protected Event process(Processor processor, Event event) throws MuleException {
-    if (isReactive()) {
-      return processAsStreamAndBlock(event, processor);
-    } else {
-      return processor.process(event);
     }
   }
 

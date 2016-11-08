@@ -8,6 +8,7 @@ package org.mule.runtime.core.construct;
 
 import static org.mule.runtime.core.api.Event.setCurrentEvent;
 import static org.mule.runtime.core.execution.ErrorHandlingExecutionTemplate.createErrorHandlingExecutionTemplate;
+import static org.mule.runtime.core.util.rx.Exceptions.rxExceptionToMuleException;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
 import org.mule.runtime.api.exception.MuleException;
@@ -31,6 +32,7 @@ import org.mule.runtime.core.interceptor.ProcessingTimeInterceptor;
 import org.mule.runtime.core.management.stats.FlowConstructStatistics;
 import org.mule.runtime.core.processor.strategy.DefaultFlowProcessingStrategyFactory;
 import org.mule.runtime.core.routing.requestreply.AsyncReplyToPropertyRequestReplyReplier;
+import org.mule.runtime.core.util.rx.Exceptions;
 
 import java.util.Optional;
 
@@ -71,7 +73,11 @@ public class Flow extends AbstractPipeline implements Processor, DynamicPipeline
         throw new DefaultMuleException(CoreMessages.createStaticMessage("Flow execution exception"), e);
       }
     } else {
-      return Mono.from(apply(Mono.just(event))).block();
+      try {
+        return Mono.from(apply(Mono.just(event))).block();
+      } catch (Exception e) {
+        throw rxExceptionToMuleException(e);
+      }
     }
   }
 
