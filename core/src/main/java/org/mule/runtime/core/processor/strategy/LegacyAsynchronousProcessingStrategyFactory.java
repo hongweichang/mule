@@ -17,6 +17,7 @@ import org.mule.runtime.core.api.DefaultMuleException;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.MuleContext;
 import org.mule.runtime.core.api.construct.Pipeline;
+import org.mule.runtime.core.api.exception.MessagingExceptionHandler;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 import org.mule.runtime.core.api.registry.RegistrationException;
@@ -63,6 +64,13 @@ public class LegacyAsynchronousProcessingStrategyFactory implements ProcessingSt
     public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
                                                                    Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
 
+      return onPipeline(pipeline, publisherFunction, pipeline.getExceptionListener());
+    }
+
+    public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
+                                                                   Function<Publisher<Event>, Publisher<Event>> publisherFunction,
+                                                                   MessagingExceptionHandler messagingExceptionHandler) {
+
       // Conserve existing 3.x async processing strategy behaviuor:
       // i) The request event is echoed rather than the the result of async processing returned
       // ii) Any exceptions that occur due to async processing are not propagated upwards
@@ -73,7 +81,9 @@ public class LegacyAsynchronousProcessingStrategyFactory implements ProcessingSt
               .transform(publisherFunction)
               .doOnNext(request -> fireAsyncCompleteNotification(request, pipeline, null))
               .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(event, pipeline, e))
-              .onErrorResumeWith(MessagingException.class, pipeline.getExceptionListener()).subscribe());
+              .onErrorResumeWith(MessagingException.class, messagingExceptionHandler).subscribe(s -> {
+              }, e -> {
+              }));
     }
 
     private Consumer<Event> assertCanProcessAsync() {

@@ -22,6 +22,8 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.construct.FlowConstruct;
 import org.mule.runtime.core.api.construct.Pipeline;
+import org.mule.runtime.core.api.exception.MessagingExceptionHandler;
+import org.mule.runtime.core.api.exception.MessagingExceptionHandlerAware;
 import org.mule.runtime.core.api.lifecycle.Initialisable;
 import org.mule.runtime.core.api.lifecycle.InitialisationException;
 import org.mule.runtime.core.api.lifecycle.Startable;
@@ -35,6 +37,7 @@ import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
 import org.mule.runtime.core.api.registry.RegistrationException;
 import org.mule.runtime.core.api.routing.RoutingException;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.runtime.core.exception.MessagingException;
 import org.mule.runtime.core.processor.strategy.LegacyAsynchronousProcessingStrategyFactory;
 import org.mule.runtime.core.util.NotificationUtils;
 import org.mule.runtime.core.work.MuleWorkManager;
@@ -56,7 +59,7 @@ import reactor.core.scheduler.Schedulers;
  * exception is thrown.
  */
 public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
-    implements Processor, Initialisable, Startable, Stoppable {
+    implements Processor, Initialisable, Startable, Stoppable, MessagingExceptionHandlerAware {
 
   protected Logger logger = LoggerFactory.getLogger(getClass());
   private AtomicBoolean consumablePayloadWarned = new AtomicBoolean(false);
@@ -66,6 +69,7 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
   protected ProcessingStrategyFactory processingStrategyFactory = new LegacyAsynchronousProcessingStrategyFactory();
   protected ProcessingStrategy processingStrategy;
   protected String name;
+  private MessagingExceptionHandler messagingExceptionHandler;
 
   public AsyncDelegateMessageProcessor(MessageProcessorChain delegate) {
     this.delegate = delegate;
@@ -123,12 +127,12 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
     return from(publisher)
         .doOnNext(checkedConsumer(event -> assertNotTransactional(event)))
         .doOnNext(event -> warnConsumablePayload(event.getMessage()))
-        .doOnNext(request -> {
+        .map(request -> {
           just(request).map(event -> updateEventForAsync(event))
-              .transform(
-                         flowConstruct instanceof Pipeline ? processingStrategy.onPipeline((Pipeline) flowConstruct, delegate)
-                             : delegate)
-              .subscribe();
+              .transform(processingStrategy.onPipeline((Pipeline) flowConstruct, delegate, messagingExceptionHandler))
+              .onErrorResumeWith(MessagingException.class, messagingExceptionHandler)
+              .subscribe(event -> {}, throwable -> {});
+          return request;
         });
   }
 
@@ -162,4 +166,9 @@ public class AsyncDelegateMessageProcessor extends AbstractMessageProcessorOwner
     NotificationUtils.addMessageProcessorPathElements(delegate, pathElement.addChild(this));
   }
 
+  @Override
+  public void setMessagingExceptionHandler(MessagingExceptionHandler messagingExceptionHandler) {
+    this.messagingExceptionHandler = messagingExceptionHandler;
+    delegate.setMessagingExceptionHandler(messagingExceptionHandler);
+  }
 }

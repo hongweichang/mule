@@ -134,7 +134,6 @@ public class MessageProcessingFlowTraceManager extends LocationExecutionContextP
   @Override
   public void onFlowStart(Event muleEvent, String flowName) {
     if (muleEvent.getFlowCallStack() instanceof DefaultFlowCallStack) {
-      System.out.println("ON FLOW START  eventId: " + System.identityHashCode(muleEvent));
       ((DefaultFlowCallStack) muleEvent.getFlowCallStack()).push(new FlowStackElement(flowName, null));
     }
   }

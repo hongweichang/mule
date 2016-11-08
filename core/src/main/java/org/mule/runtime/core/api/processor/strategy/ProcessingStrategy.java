@@ -9,6 +9,7 @@ package org.mule.runtime.core.api.processor.strategy;
 import static reactor.core.publisher.Flux.from;
 import org.mule.runtime.core.api.Event;
 import org.mule.runtime.core.api.construct.Pipeline;
+import org.mule.runtime.core.api.exception.MessagingExceptionHandler;
 import org.mule.runtime.core.api.processor.Processor;
 
 import java.util.function.Function;
@@ -25,7 +26,14 @@ public interface ProcessingStrategy {
     return publisher -> from(publisher).transform(publisherFunction);
   }
 
-  default Function<Publisher<Event>, Publisher<Event>> onProcessor(Processor messageProcessor,
+  default Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
+                                                                  Function<Publisher<Event>, Publisher<Event>> publisherFunction,
+                                                                  MessagingExceptionHandler messagingExceptionHandler) {
+    return onPipeline(pipeline, publisherFunction);
+  }
+
+
+    default Function<Publisher<Event>, Publisher<Event>> onProcessor(Processor messageProcessor,
                                                                    Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
     return publisher -> from(publisher).transform(publisherFunction);
   }
