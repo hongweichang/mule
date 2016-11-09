@@ -86,7 +86,9 @@ public class LegacyAsynchronousProcessingStrategyFactory implements ProcessingSt
               .doOnNext(request -> fireAsyncCompleteNotification(request, pipeline, null))
               .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(event, pipeline, e))
               .onErrorResumeWith(MessagingException.class, messagingExceptionHandler)
-              .subscribe(event1 -> {}, throwable -> {}));
+              .subscribe(event1 -> {
+              }, throwable -> {
+              }));
     }
 
     private Consumer<Event> assertCanProcessAsync() {
