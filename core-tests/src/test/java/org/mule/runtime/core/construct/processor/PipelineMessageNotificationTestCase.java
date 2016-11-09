@@ -22,11 +22,7 @@ import static org.mule.runtime.core.context.notification.AsyncMessageNotificatio
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_COMPLETE;
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_END;
 import static org.mule.runtime.core.context.notification.PipelineMessageNotification.PROCESS_START;
-import static org.mule.runtime.core.util.rx.Exceptions.rxExceptionToMuleException;
-import static org.mule.tck.MuleTestUtils.processAsStreamAndBlock;
 import static org.mule.tck.util.MuleContextUtils.mockContextWithServices;
-import static reactor.core.Exceptions.unwrap;
-import static reactor.core.publisher.Mono.just;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.core.DefaultEventContext;
 import org.mule.runtime.core.TransformationService;
@@ -63,7 +59,6 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.ArgumentMatcher;
-import reactor.core.Exceptions;
 
 @RunWith(Parameterized.class)
 public class PipelineMessageNotificationTestCase extends AbstractReactiveProcessorTestCase {

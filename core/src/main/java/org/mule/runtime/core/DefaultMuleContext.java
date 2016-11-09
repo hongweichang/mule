@@ -250,7 +250,7 @@ public class DefaultMuleContext implements MuleContext {
       if (signal instanceof Event) {
         // Rewrap messaging exception so wrapped messaging exception is conserved when messaging exception is unwrapped to
         // conserve existing behaviour.
-        return new MessagingException((Event) signal, unwrap(throwable));
+        return throwable instanceof MessagingException ? throwable : new MessagingException((Event) signal, unwrap(throwable));
       } else {
         return throwable;
       }

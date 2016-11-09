@@ -7,10 +7,12 @@
 package org.mule.runtime.core.processor.strategy;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.logging.Level.WARNING;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static reactor.core.Exceptions.propagate;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
+import static reactor.core.publisher.SignalType.ON_ERROR;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.core.api.DefaultMuleException;
@@ -29,10 +31,12 @@ import org.mule.runtime.core.processor.strategy.AsynchronousProcessingStrategyFa
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 import javax.resource.spi.work.WorkManager;
 
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.SignalType;
 
 /**
  * This factory's strategy uses a {@link WorkManager} to schedule the processing of the pipeline of message processors in a single
@@ -81,9 +85,8 @@ public class LegacyAsynchronousProcessingStrategyFactory implements ProcessingSt
               .transform(publisherFunction)
               .doOnNext(request -> fireAsyncCompleteNotification(request, pipeline, null))
               .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(event, pipeline, e))
-              .onErrorResumeWith(MessagingException.class, messagingExceptionHandler).subscribe(s -> {
-              }, e -> {
-              }));
+              .onErrorResumeWith(MessagingException.class, messagingExceptionHandler)
+              .subscribe(event1 -> {}, throwable -> {}));
     }
 
     private Consumer<Event> assertCanProcessAsync() {

@@ -7,8 +7,10 @@
 package org.mule.runtime.core.processor.strategy;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.logging.Level.WARNING;
 import static reactor.core.publisher.Flux.from;
 import static reactor.core.publisher.Flux.just;
+import static reactor.core.publisher.SignalType.ON_ERROR;
 import static reactor.core.scheduler.Schedulers.fromExecutorService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.core.api.Event;
@@ -26,6 +28,8 @@ import java.util.function.Supplier;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * This factory's processing strategy uses the 'asynchronous' strategy where possible, but if an event is synchronous it processes
@@ -54,30 +58,20 @@ public class DefaultFlowProcessingStrategyFactory extends LegacyAsynchronousProc
     @Override
     public Function<Publisher<Event>, Publisher<Event>> onPipeline(Pipeline pipeline,
                                                                    Function<Publisher<Event>, Publisher<Event>> publisherFunction) {
-      return publisher -> from(publisher).concatMap(request -> {
-        Flux<Event> flux = just(request);
-
+      return publisher -> from(publisher).map(request -> {
         if (canProcessAsync(request)) {
-          flux = flux.doOnNext(fireAsyncScheduledNotification(pipeline)).publishOn(fromExecutorService(getScheduler()));
+          try {
+            just(request).transform(super.onPipeline(pipeline, publisherFunction)).subscribe(event -> {
+            }, e -> {
+            });
+            return request;
+          } catch (Exception e) {
+            throw e;
+          }
+        } else {
+          return Mono.just(request).transform(publisherFunction).block();
         }
-
-        flux = flux.transform(publisherFunction);
-
-        if (canProcessAsync(request)) {
-          flux = flux.map(response -> request)
-              // Conserve existing 3.x async processing strategy behaviuor:
-              // i) The request event is echoed rather than the the result of async processing returned
-              // ii) Any exceptions that occur due to async processing are not propagated upwards but rather handled here
-              .doOnNext(event -> fireAsyncCompleteNotification(event, pipeline, null))
-              .doOnError(MessagingException.class, e -> fireAsyncCompleteNotification(request, pipeline, e))
-              .onErrorResumeWith(MessagingException.class, pipeline.getExceptionListener())
-              .onErrorReturn(MessagingException.class, request);
-
-        }
-
-        return flux;
       });
-
     }
 
     protected boolean canProcessAsync(Event event) {
